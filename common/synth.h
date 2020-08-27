@@ -6,7 +6,7 @@
 #include "hardware.h"
 
 //#define DEBUG
-#define RELEASE "1.99"
+#define RELEASE "Ver 2.24 jrs"
 
 #define UART_USE_HW_INTERRUPT // this needs an additional wire that goes from pin C4 to pin E4
 
@@ -14,10 +14,10 @@
 	#ifdef RELEASE
 		#define VERSION RELEASE
 	#else
-		#define VERSION "alpha "__DATE__
+		#define VERSION " alpha "__DATE__
 	#endif
 #else
-	#define VERSION "debug "__DATE__ " " __TIME__
+	#define VERSION " debug "__DATE__ " " __TIME__
 #endif
 
 #define SYNTH_VOICE_COUNT 6
@@ -25,13 +25,26 @@
 #define SYSEX_ID_0 0x00
 #define SYSEX_ID_1 0x61
 #define SYSEX_ID_2 0x16
+#define SYSEX_ID_UNIVERSAL_NON_REALTIME 0x7E
 
-#define SYSEX_COMMAND_BANK_A 1
-#define SYSEX_COMMAND_BANK_B 2
+#define SYSEX_COMMAND_PATCH_DUMP 1
+#define SYSEX_COMMAND_PATCH_DUMP_REQUEST 2
 #define SYSEX_COMMAND_UPDATE_FW 0x6b
 
+#define SYSEX_SUBID1_BULK_TUNING_DUMP 0x08
+#define SYSEX_SUBID2_BULK_TUNING_DUMP_REQUEST 0x00
+#define SYSEX_SUBID2_BULK_TUNING_DUMP 0x01
+
 #define TICKER_1S 500
-#define TEMP_BUFFER_SIZE 512
+#define TEMP_BUFFER_SIZE 406 // need at least 406 bytes for MTS sysexes
+
+// Some constants for 16 bit ranges */
+#define FULL_RANGE UINT16_MAX
+#define HALF_RANGE (FULL_RANGE/2+1)
+#define HALF_RANGE_L (65536UL*HALF_RANGE) // i.e. HALF_RANGE<<16, as uint32_t
+//#define MY_VELOCITY 100 * 512 // added per RDP keyboard velocity code REM this out to change to a variable
+// MY_VELOCITY= 512 * settings.kbdVel // added V2.24 JRS
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Prophet 600 definitions
@@ -67,7 +80,7 @@ typedef enum
 
 typedef enum
 {
-	pb0=0,pb1,pb2,pb3,pb4,pb5,pb6,pb7,                                            
+	pb0=0,pb1,pb2,pb3,pb4,pb5,pb6,pb7=7,                                            
 	pb8=8,pb9,pbArpUD,pbArpAssign,pbPreset,pbRecord,pbToTape,pbFromTape,          
 	pbSeq1=16,pbSeq2,pbTune,                                                      
 	pbASqr=24,pbBSqr,pbFilFull,pbFilHalf,pbLFOShape,pbLFOFreq,pbLFOPW,pbLFOFil,   
@@ -76,7 +89,7 @@ typedef enum
 
 typedef enum
 {
-	modOff=0,modVCO=1,modVCF=2,modVCA=3,modPW=4
+	modOff=0,modVCO=1,modVCF=2,modVCA=3,modPW=4,modVCOB=5 //added VCOB V2.20 JRS
 } modulation_t;
 
 typedef enum
@@ -94,6 +107,8 @@ void synth_keyEvent(uint8_t key, int pressed);
 void synth_assignerEvent(uint8_t note, int8_t gate, int8_t voice, uint16_t velocity, int8_t legato); // voice -1 is unison
 void synth_uartEvent(uint8_t data);
 void synth_wheelEvent(int16_t bend, uint16_t modulation, uint8_t mask, int8_t outputToMidi);
+void synth_volEvent(uint16_t value);//to add MIDI volume V2.24JRS
+void synth_updateBender(void);
 void synth_realtimeEvent(uint8_t midiEvent);
 
 void synth_init(void);
@@ -103,7 +118,7 @@ void synth_uartInterrupt(void);
 
 extern volatile uint32_t currentTick; // 500hz
 extern uint8_t tempBuffer[TEMP_BUFFER_SIZE]; // general purpose chunk of RAM
-
+extern const uint16_t extClockDividers[16];
 
 #endif	/* SYNTH_H */
 

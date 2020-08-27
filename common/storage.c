@@ -6,13 +6,14 @@
 #include "uart_6850.h"
 
 // increment this each time the binary format is changed
-#define STORAGE_VERSION 3
+#define STORAGE_VERSION 10
 
 #define STORAGE_MAGIC 0x006116a5
-#define STORAGE_MAX_SIZE 512
 
 #define SETTINGS_PAGE_COUNT 2
 #define SETTINGS_PAGE ((STORAGE_SIZE/STORAGE_PAGE_SIZE)-4)
+
+#define STORAGE_MAX_SIZE (SETTINGS_PAGE_COUNT*STORAGE_PAGE_SIZE)
 
 const uint8_t steppedParametersBits[spCount] = 
 {
@@ -32,7 +33,7 @@ const uint8_t steppedParametersBits[spCount] =
 	/*FilEnvExpo*/1,
 	/*FilEnvSlow*/1,
 	/*AmpEnvExpo*/1,
-	/*AmpEnvSlow*/1,
+	/*HoldPedal*/0,
 	/*Unison*/1,
 	/*AssignerPriority*/2,
 	/*BenderSemitones*/4,
@@ -41,6 +42,7 @@ const uint8_t steppedParametersBits[spCount] =
 	/*ChromaticPitch*/2,
 	/*ModwheelTarget*/1,
 	/*VibTarget*/2,
+	/*AmpEnvSlow*/1,
 };
 
 struct settings_s settings;
@@ -191,7 +193,12 @@ LOWERCODESIZE int8_t settings_load(void)
 		// defaults
 
 		settings.voiceMask=0x3f;
-
+		settings.spread=0;
+		settings.vcfLimit=0;
+		settings.seqArpClock=HALF_RANGE;
+        settings.kbdVel=0x40; //added V2.24 JRS storing default keyboard velocity of 64
+        settings.transpose=0x30; //added V2.24 JRS storing default transpose of 0
+        
 		if (storage.version<1)
 			return 1;
 
@@ -223,11 +230,42 @@ LOWERCODESIZE int8_t settings_load(void)
 	
 		if (storage.version<4)
 			return 1;
-
+		
 		// v4
 		
-		// ...
-	
+		settings.spread=storageReadS8();
+
+		if (storage.version<5)
+			return 1;
+
+		// v5
+		
+		settings.vcfLimit=storageReadS8();
+
+		if (storage.version<6)
+			return 1;
+
+		// v6
+		
+        settings.seqArpClock=storageRead16(); //rem'ed out to not store arp clock V2.24 JRS Aug 24 2020
+
+		if (storage.version<7)
+			return 1;
+
+        // v9
+        
+        settings.kbdVel=storageRead16(); //adding local keyboard velocity V2.24 JRS
+        
+        if (storage.version<9)
+            return 1;
+        
+        // v10
+        
+        settings.transpose=storageRead16(); //adding local keyboard velocity V2.24 JRS
+        
+        if (storage.version<10)
+            return 1;
+        // ...
 	
 	}
 	
@@ -263,7 +301,24 @@ LOWERCODESIZE void settings_save(void)
 		storageWrite8(settings.syncMode);
 		
 		// v4
+		storageWriteS8(settings.spread);
 		
+		// v5
+		
+		storageWriteS8(settings.vcfLimit);
+
+		// v6
+		
+		settings.seqArpClock=currentPreset.continuousParameters[cpSeqArpClock];  //maybe remove so its not changed with preset V2.24 JRS Aug 24 2020
+        storageWrite16(settings.seqArpClock);
+        
+        // v9
+        storageWrite16(settings.kbdVel); //V2.24 JRS keyboard velocity
+        
+        // v10
+        storageWrite16(settings.transpose); //V2.24 JRS keyboard transpose
+        
+
 		// ...
 
 		// this must stay last
@@ -273,7 +328,7 @@ LOWERCODESIZE void settings_save(void)
 
 LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
 {
-	int8_t i;
+	uint8_t i;
 	
 	BLOCK_INT
 	{
@@ -282,7 +337,8 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
 
 		// defaults
 		
-		currentPreset.steppedParameters[spAssignerPriority]=apLast;
+		preset_loadDefault(0);
+		
 		for(i=0;i<SYNTH_VOICE_COUNT;++i)
 			currentPreset.voicePattern[i]=(i==0)?0:ASSIGNER_NO_NOTE;
 		
@@ -294,24 +350,53 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
 		continuousParameter_t cp;
 		for(cp=cpFreqA;cp<=cpFilVelocity;++cp)
 			currentPreset.continuousParameters[cp]=storageRead16();
-
+        
 		steppedParameter_t sp;
 		for(sp=spASaw;sp<=spChromaticPitch;++sp)
 			currentPreset.steppedParameters[sp]=storageRead8();
+		
+		currentPreset.steppedParameters[spAmpEnvSlow]=currentPreset.steppedParameters[holdPedal];
 
 		if (storage.version<2)
 			return 1;
 
 		// v2
-
-		for(cp=cpModDelay;cp<=cpSeqArpClock;++cp)
+  
+		for(cp=cpModDelay;cp<=cpSeqArpClock;++cp) // maybe cpUnisonDetune so we dont recall clock V2.24
 			currentPreset.continuousParameters[cp]=storageRead16();
-
+        
 		for(sp=spModwheelTarget;sp<=spVibTarget;++sp)
 			currentPreset.steppedParameters[sp]=storageRead8();
 
 		for(i=0;i<SYNTH_VOICE_COUNT;++i)
 			currentPreset.voicePattern[i]=storageRead8();
+
+		currentPreset.continuousParameters[cpSeqArpClock]=settings.seqArpClock;
+
+		if (storage.version<7)
+			return 1;
+
+		// v7
+		
+		for (i=0; i<TUNER_NOTE_COUNT; i++)
+			currentPreset.perNoteTuning[i]=storageRead16();
+        // v8
+
+        if (storage.version<8)
+            return 1;
+        
+        for(cp=cpModDelay;cp<=cpNoiseLevel;++cp) // for Noise ... rem'ed out so we dont recall clock
+            currentPreset.continuousParameters[cp]=storageRead16();
+       // currentPreset.continuousParameters[cpNoiseLevel]=storageRead16();
+        
+        // v10
+        if (storage.version<10)
+            return 1;
+
+        for(cp=cpModDelay;cp<=cpUnisonDetune;++cp) // for Noise and skip clock recall
+            currentPreset.continuousParameters[cp]=storageRead16();
+        currentPreset.continuousParameters[cpNoiseLevel]=storageRead16();
+        
 	}
 	
 	return 1;
@@ -319,7 +404,7 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
 
 LOWERCODESIZE void preset_saveCurrent(uint16_t number)
 {
-	int8_t i;
+	uint8_t i;
 	
 	BLOCK_INT
 	{
@@ -330,12 +415,15 @@ LOWERCODESIZE void preset_saveCurrent(uint16_t number)
 		continuousParameter_t cp;
 		for(cp=cpFreqA;cp<=cpFilVelocity;++cp)
 			storageWrite16(currentPreset.continuousParameters[cp]);
+        
+		currentPreset.steppedParameters[holdPedal]=currentPreset.steppedParameters[spAmpEnvSlow];
 
 		steppedParameter_t sp;
 		for(sp=spASaw;sp<=spChromaticPitch;++sp)
 			storageWrite8(currentPreset.steppedParameters[sp]);
 		
 		// v2
+  
 		
 		for(cp=cpModDelay;cp<=cpSeqArpClock;++cp)
 			storageWrite16(currentPreset.continuousParameters[cp]);
@@ -346,12 +434,50 @@ LOWERCODESIZE void preset_saveCurrent(uint16_t number)
 		for(i=0;i<SYNTH_VOICE_COUNT;++i)
 			storageWrite8(currentPreset.voicePattern[i]);
 		
+		settings.seqArpClock=currentPreset.continuousParameters[cpSeqArpClock];
+
+		for (i=0; i<TUNER_NOTE_COUNT; i++)
+			storageWrite16(currentPreset.perNoteTuning[i]);
+        
+        // v8
+       
+        for(cp=cpModDelay;cp<=cpNoiseLevel;++cp)//for Noise
+        storageWrite16(currentPreset.continuousParameters[cp]);
+
 		// this must stay last
 		storageFinishStore(number,1);
 	}
 }
 
-LOWERCODESIZE void storage_export(uint16_t number, uint8_t * buf, int16_t * size)
+LOWERCODESIZE int8_t storage_loadSequencer(int8_t track, uint8_t * data, uint8_t size)
+{
+	BLOCK_INT
+	{
+		if (!storageLoad(SEQUENCER_START_PAGE+track,1))
+			return 0;
+		
+		while(size--)
+			*data++=storageRead8();
+	}
+	
+	return 1;
+}
+
+LOWERCODESIZE void storage_saveSequencer(int8_t track, uint8_t * data, uint8_t size)
+{
+	BLOCK_INT
+	{
+		storagePrepareStore();
+
+		while(size--)
+			storageWrite8(*data++);
+		
+		// this must stay last
+		storageFinishStore(SEQUENCER_START_PAGE+track,1);
+	}
+}
+
+LOWERCODESIZE void storage_export(uint16_t number, uint8_t * buf, int16_t * loadedSize)
 {
 	int16_t actualSize;
 
@@ -362,12 +488,12 @@ LOWERCODESIZE void storage_export(uint16_t number, uint8_t * buf, int16_t * size
 		// don't export trailing zeroes		
 		
 		actualSize=STORAGE_PAGE_SIZE;
-		while(storage.buffer[actualSize-1]==0)
+		while(actualSize>0 && storage.buffer[actualSize-1]==0)
 			--actualSize;
 		
 		buf[0]=number;		
 		memcpy(&buf[1],storage.buffer,actualSize);
-		*size=actualSize+1;
+		*loadedSize=actualSize+1;
 	}
 }
 
@@ -384,19 +510,22 @@ LOWERCODESIZE void storage_import(uint16_t number, uint8_t * buf, int16_t size)
 
 LOWERCODESIZE void preset_loadDefault(int8_t makeSound)
 {
+	uint8_t i;
+    
 	BLOCK_INT
 	{
 		memset(&currentPreset,0,sizeof(currentPreset));
 
-		currentPreset.continuousParameters[cpAPW]=UINT16_MAX/2;
-		currentPreset.continuousParameters[cpBPW]=UINT16_MAX/2;
+		currentPreset.continuousParameters[cpAPW]=HALF_RANGE;
+		currentPreset.continuousParameters[cpBPW]=HALF_RANGE;
 		currentPreset.continuousParameters[cpCutoff]=UINT16_MAX;
-		currentPreset.continuousParameters[cpFilEnvAmt]=UINT16_MAX/2;
+		currentPreset.continuousParameters[cpFilEnvAmt]=HALF_RANGE;
 		currentPreset.continuousParameters[cpAmpSus]=UINT16_MAX;
 		currentPreset.continuousParameters[cpVolA]=UINT16_MAX;
-		currentPreset.continuousParameters[cpAmpVelocity]=UINT16_MAX/2;
-		currentPreset.continuousParameters[cpSeqArpClock]=UINT16_MAX/2;
-		currentPreset.continuousParameters[cpVibFreq]=UINT16_MAX/2;
+		currentPreset.continuousParameters[cpAmpVelocity]=HALF_RANGE;
+		//currentPreset.continuousParameters[cpSeqArpClock]=HALF_RANGE;  //Remed out to stop default tempo setting when blanking out template  V2.24 JRS
+		currentPreset.continuousParameters[cpVibFreq]=HALF_RANGE;
+        currentPreset.continuousParameters[cpNoiseLevel]=0;// for Noise
 
 		currentPreset.steppedParameters[spBenderSemitones]=5;
 		currentPreset.steppedParameters[spBenderTarget]=modVCO;
@@ -406,6 +535,10 @@ LOWERCODESIZE void preset_loadDefault(int8_t makeSound)
 		currentPreset.steppedParameters[spChromaticPitch]=2; // octave
 		
 		memset(currentPreset.voicePattern,ASSIGNER_NO_NOTE,sizeof(currentPreset.voicePattern));
+
+		// Default tuning is equal tempered
+		for (i=0; i<TUNER_NOTE_COUNT; i++)
+			currentPreset.perNoteTuning[i] = i * TUNING_UNITS_PER_SEMITONE;
 
 		if(makeSound)
 			currentPreset.steppedParameters[spASaw]=1;
@@ -418,9 +551,10 @@ LOWERCODESIZE void settings_loadDefault(void)
 	{
 		memset(&settings,0,sizeof(settings));
 		
-		settings.benderMiddle=UINT16_MAX/2;
+		settings.benderMiddle=HALF_RANGE;
 		settings.midiReceiveChannel=-1;
 		settings.voiceMask=0x3f;
+		settings.seqArpClock=HALF_RANGE;
 		
 		tuner_init(); // use theoretical tuning
 	}

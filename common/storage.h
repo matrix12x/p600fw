@@ -6,6 +6,7 @@
 #include "assigner.h"
 
 #define MANUAL_PRESET_PAGE ((STORAGE_SIZE/STORAGE_PAGE_SIZE)-5)
+#define SEQUENCER_START_PAGE 200
 
 typedef enum
 {
@@ -23,11 +24,14 @@ typedef enum
 	cpVibFreq=26,cpVibAmt=27,
 	cpUnisonDetune=28,
 	cpSeqArpClock=29,
-
+    cpNoiseLevel=30, // for Noise V2.20
+    
 	// /!\ this must stay last
 	cpCount
 } continuousParameter_t;
 
+// These start at 48, which means that MIDI hold pedal will end up at
+// offset 16, so don't use that one for a parameter.
 typedef enum
 {
 	spASaw=0,spATri=1,spASqr=2,
@@ -39,7 +43,7 @@ typedef enum
 
 	spTrackingShift=12,
 	spFilEnvExpo=13,spFilEnvSlow=14,
-	spAmpEnvExpo=15,spAmpEnvSlow=16,
+	spAmpEnvExpo=15,holdPedal=16,
 			
 	spUnison=17,
 	spAssignerPriority=18,
@@ -51,6 +55,7 @@ typedef enum
 			
 	spModwheelTarget=23,
 	spVibTarget=24,
+	spAmpEnvSlow=25,
 			
 	// /!\ this must stay last
 	spCount
@@ -70,7 +75,17 @@ struct settings_s
 	uint8_t voiceMask;
 	
 	int8_t syncMode;
+    
+    int8_t kbdVel; //V2.24 JRS
+	
+	int8_t spread;
+	int8_t vcfLimit;
+    int8_t transpose;// added to Storage.h from synth.c V2.24 JRS
+	
+	uint16_t seqArpClock;
 };
+
+#define TUNING_UNITS_PER_SEMITONE 5461.3333333 // 1/5461 of a semitone (== pow(2,16)/12)
 
 struct preset_s
 {
@@ -78,6 +93,8 @@ struct preset_s
 	uint16_t continuousParameters[cpCount];
 	
 	uint8_t voicePattern[SYNTH_VOICE_COUNT];
+  
+    uint16_t perNoteTuning[TUNER_NOTE_COUNT]; // see TUNING_UNITS_PER_SEMITONE
 };
 
 extern struct settings_s settings;
@@ -93,8 +110,12 @@ void preset_saveCurrent(uint16_t number);
 void preset_loadDefault(int8_t makeSound);
 void settings_loadDefault(void);
 
-void storage_export(uint16_t number, uint8_t * buf, int16_t * size);
+void storage_simpleExport(uint16_t number, uint8_t * buf, int16_t size);
+void storage_export(uint16_t number, uint8_t * buf, int16_t * loadedSize);
 void storage_import(uint16_t number, uint8_t * buf, int16_t size);
+
+int8_t storage_loadSequencer(int8_t track, uint8_t * data, uint8_t size);
+void storage_saveSequencer(int8_t track, uint8_t * data, uint8_t size);
 
 #endif	/* STORAGE_H */
 

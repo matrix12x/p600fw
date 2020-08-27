@@ -5,6 +5,7 @@
 #include "lfo.h"
 
 static uint16_t sineShape[256];
+static uint16_t lfoSeq[16];  // NEW LFO shapes JHHL
 
 static void updateIncrement(struct lfo_s * lfo)
 {
@@ -40,7 +41,8 @@ static void handlePhaseOverflow(struct lfo_s * l)
 		;
 	}
 }
-
+// void LOWERCODESIZE newSeq(void) // NEW LFO shapes JHHL
+//;
 void LOWERCODESIZE lfo_setCVs(struct lfo_s * lfo, uint16_t spd, uint16_t lvl)
 {
 	lfo->levelCV=lvl;
@@ -53,6 +55,43 @@ void LOWERCODESIZE lfo_setCVs(struct lfo_s * lfo, uint16_t spd, uint16_t lvl)
 	}
 }
 
+// NEW LFO shapes JHHL  the idea here is to make up a little melody with some redundancy.
+void LOWERCODESIZE newSeq(void)
+{
+    for(int i = 0 ; i<16;i++)
+    {
+        uint16_t r=random();
+        
+         if(i==0)
+        {
+            lfoSeq[i]=r;
+        }
+        else
+        {
+            // 3/8 of the time, choose a new pitch
+            if((r&0x0007) <3)
+            {
+                lfoSeq[i]=random();
+            }
+            else
+            {
+                // 5/8ths of the time, repeat the last one
+                if((r&0x0070)<0x0050)
+                {
+                    lfoSeq[i]=lfoSeq[i-1];
+                }
+                else
+                {
+                    int t = (r>>8)%i;
+                    lfoSeq[i]=lfoSeq[t];
+                }
+            }
+        }
+    }
+}
+
+static lfoShape_t lastShape;
+
 void LOWERCODESIZE lfo_setShape(struct lfo_s * lfo, lfoShape_t shape)
 {
 	lfo->shape=shape;
@@ -61,6 +100,13 @@ void LOWERCODESIZE lfo_setShape(struct lfo_s * lfo, lfoShape_t shape)
 		srandom(currentTick);
 	
 	lfo->noise=random();
+    
+    if((shape !=lastShape) &&(shape == lsSeq)) // NEW LFO shapes JHHL
+    {
+        newSeq();
+    }
+    
+    lastShape = shape;
 }
 
 void LOWERCODESIZE lfo_setSpeedShift(struct lfo_s * lfo, uint8_t shift)
@@ -95,6 +141,20 @@ const char * lfo_shapeName(lfoShape_t shape)
 		return "noise";
 	case lsSaw:
 		return "saw";
+// NEW LFO shapes JHHL
+    case lsSeq:
+        return "seq";
+    case lsStep8:
+        return "step8";
+    case lsStep4:
+        return "step4";
+// from Overcycler code
+    case lsRevSaw:
+        return "rev-saw";
+    case lsbitTri:
+        return "bit-tri";
+    case lsbitSine:
+        return "bitSine";
 	}
 	
 	return "";
@@ -108,6 +168,11 @@ void lfo_init(struct lfo_s * lfo)
 	
 	for(i=0;i<256;++i)
 		sineShape[i]=(cosf((i/255.0f+1.0f)*M_PI)+1.0f)/2.0f*65535.0f;
+}
+
+// bit reduction quantitizer for bit-tri and bit-sine
+short keep_bits_from_16(short input, int keepBits) {
+    return (input & (-1 << (16-keepBits)));
 }
 
 inline void lfo_update(struct lfo_s * l)
@@ -136,24 +201,85 @@ inline void lfo_update(struct lfo_s * l)
 		if(l->halfPeriod)
 			l->rawOutput=UINT16_MAX-l->rawOutput;
 		break;
-	default:
-		;
+//from GLIGLI Overcycler code
+    case lsRevSaw:
+        l->rawOutput=l->phase>>9;
+        if(!l->halfPeriod)
+            l->rawOutput=UINT16_MAX-l->rawOutput;
+        break;
+            
+//New LFO shapes JHHL added version 2.20 and 2.21
+    case lsSeq:
+        l->rawOutput=l->phase>>9;
+        if(l->halfPeriod)
+            l->rawOutput=UINT16_MAX-l->rawOutput;
+        
+        l->rawOutput=lfoSeq[(l->rawOutput>>(16-4)) & 0x000F];
+        break;
+ 
+    case lsStep8:
+        l->rawOutput=l->phase>>9;
+        if(l->halfPeriod)
+            l->rawOutput=UINT16_MAX-l->rawOutput;
+        l->rawOutput&=0xE000;
+        break;
+            
+    case lsStep4:
+        l->rawOutput=l->phase>>9;
+        if(l->halfPeriod)
+            l->rawOutput=UINT16_MAX-l->rawOutput;
+        l->rawOutput&=0x8000;
+        break;
+            
+    // quantitized triangle and Sine added version 2.22
+    case lsbitTri:
+        l->rawOutput=l->phase>>8;
+        l->rawOutput=keep_bits_from_16(l->rawOutput, 4);
+        break;
+    case lsbitSine:
+        l->rawOutput=computeShape(l->phase,sineShape,1);
+        l->rawOutput=keep_bits_from_16(l->rawOutput, 6);
+        break;
+            
+    default:
+        ;
 	}
 	
 	// phase increment
-	
-	l->phase+=l->increment;
+    // revised by New LFO shapes JHHL
+   //  l->phase+=l->increment;  //rem out for new LFO waveform Seq
+    
+    switch(l->shape)
+    {
+        default:
+            l->phase+=l->increment;
+            break;
+            //New LFO shapes
+        case lsSeq:
+            l->phase+=(l->increment>>4);
+            break;
+        case lsStep8:
+            l->phase+=(l->increment>>3);
+            break;
+        case lsStep4:
+            l->phase+=(l->increment>>2);
+            break;
+    }
+    
 
 	// compute output
 	
-	int32_t o;
-	
-	o=l->rawOutput;
-	o+=INT16_MIN;
-	o*=l->levelCV;
-	o/=UINT16_MAX;
-	
-	l->output=o;
+	l->output=scaleU16S16(l->levelCV,(int32_t)l->rawOutput+INT16_MIN); //REM'ed out based on NEW LFO below
+
+    /*   this is for the SEQ waveform
+     int32_t o;
+    
+    o=l->rawOutput;
+    o+=INT16_MIN;
+    o*=l->levelCV;
+    o/=UINT16_MAX;
+    l->output=o;
+     */
 }
 
 

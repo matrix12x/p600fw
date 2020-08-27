@@ -2,10 +2,10 @@
 #define	LFO_H
 
 #include "synth.h"
-
+// added new LFO shapes per JHHL and Revsaw from Overcycler 
 typedef enum
 {
-	lsPulse=0,lsTri=1,lsRand=2,lsSine=3,lsNoise=4,lsSaw=5
+	lsPulse=0,lsTri=1,lsRand=2,lsSine=3,lsNoise=4,lsSaw=5,lsStep8=6,lsRevSaw=7,lsSeq=8,lsStep4=9,lsbitTri=10,lsbitSine=11
 } lfoShape_t;
 
 struct lfo_s

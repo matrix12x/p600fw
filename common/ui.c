@@ -4,6 +4,7 @@
 
 #include "ui.h"
 #include "storage.h"
+#include "seq.h"
 #include "arp.h"
 #include "scanner.h"
 #include "display.h"
@@ -13,27 +14,41 @@
 const struct uiParam_s uiParameters[] =
 {
 	/*first press*/
-	/*0*/ {.type=ptCont,.number=cpSeqArpClock,.name="speed"},
-	/*1*/ {.type=ptCust,.number=0,.name="lfo shape",.values={"pulse-tri","rand-sin","noise-saw"}},
-	/*2*/ {.type=ptCont,.number=cpVibFreq,.name="Vib spd"},
+	/*0*/ {.type=ptCont,.number=cpSeqArpClock,.name="spd"},
+	/*1*/ {.type=ptCust,.number=0,.name="lfo shp",.values={"puls-tri","rnd-sin","nois-saw","step8-revsaw","seq-step4","bit_tri-bit_sine"}}, // Added new LFO waveforms
+    /*2*/ {.type=ptCont,.number=cpVibFreq,.name="Vib spd"},
 	/*3*/ {.type=ptCont,.number=cpVibAmt,.name="Vib amt"},
-	/*4*/ {.type=ptCont,.number=cpModDelay,.name="mod delay"},
-	/*5*/ {.type=ptCust,.number=2,.name="amp shape",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
-	/*6*/ {.type=ptStep,.number=spBenderTarget,.name="bend tgt",.values={"off","Vco","Vcf","Vol"}},
+	/*4*/ {.type=ptCont,.number=cpModDelay,.name="mod dly"},
+	/*5*/ {.type=ptCust,.number=2,.name="amp shp",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
+	/*6*/ {.type=ptStep,.number=spBenderTarget,.name="bend tgt",.values={"off","Vco","Vcf","Vol","PW","Vco-b"}},  // added VcoB "Vol","PW",
 	/*7*/ {.type=ptCont,.number=cpGlide,.name="glide"},
 	/*8*/ {.type=ptCont,.number=cpUnisonDetune,.name="detune"},
-	/*9*/ {.type=ptCont,.number=cpAmpVelocity,.name="amp Velo"},
+	/*9*/ {.type=ptCont,.number=cpAmpVelocity,.name="amp Vel"},
 	/*second press*/
-	/*0*/ {.type=ptCont,.number=cpSeqArpClock,.name="speed"},
-	/*1*/ {.type=ptCust,.number=1,.name="lfo tgt",.values={"ab","a","b"}},
-	/*2*/ {.type=ptStep,.number=spLFOShift,.name="lfo range",.values={"low","high"}},
-	/*3*/ {.type=ptCust,.number=5,.name="mod range",.values={"min","low","high","full"}},
-	/*4*/ {.type=ptStep,.number=spModwheelTarget,.name="mod tgt",.values={"lfo","Vib"}},
-	/*5*/ {.type=ptCust,.number=3,.name="fil shape",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
-	/*6*/ {.type=ptCust,.number=4,.name="bend range",.values={"2nd","3rd","5th","Oct"}},
+	//*0*/ {.type=ptCont,.number=cpSeqArpClock,.name="spd"}, // removed for Noise
+    /*0*/ {.type=ptCont,.number=cpNoiseLevel,.name="noise"}, //for Noise
+	/*1*/ {.type=ptCust,.number=1,.name="lfo tgt",.values={"ab","a","b","ab-Vca"}},
+	/*2*/ {.type=ptStep,.number=spLFOShift,.name="lfo ran",.values={"low","high"}},
+	/*3*/ {.type=ptCust,.number=5,.name="mod ran",.values={"min","low","high","full"}},
+	/*4*/ {.type=ptStep,.number=spModwheelTarget,.name="mod tgt",.values={"lfo","Vib"}},  //Modwheel target lfo freq ,"lfoFreq"
+	/*5*/ {.type=ptCust,.number=3,.name="fil shp",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
+	/*6*/ {.type=ptCust,.number=4,.name="bend ran",.values={"2nd","3rd","5th","Oct"}},
 	/*7*/ {.type=ptStep,.number=spAssignerPriority,.name="prio",.values={"last","low","high"}},	
-	/*8*/ {.type=ptStep,.number=spChromaticPitch,.name="pitch",.values={"free","semitone","octaVe"}},
-	/*9*/ {.type=ptCont,.number=cpFilVelocity,.name="fil Velo"},
+	/*8*/ {.type=ptStep,.number=spChromaticPitch,.name="pitch",.values={"free","semi","oct"}},
+	/*9*/ {.type=ptCont,.number=cpFilVelocity,.name="fil Vel"},
+    /*third press*/
+    
+    // /*0*/ {.type=ptCont,.number=cpAttVelocity,.name="fil Attack Vel"},   //attvelocity
+    /*1*/ //{.type=ptCust,.number=6,.name="vib shp",.values={"puls-tri","rnd-sin","nois-saw","step8-revsaw","seq-step4","bit_tri-bit_sine"}}, // Added vib LFO waveforms
+    /*1*/ //{.type=ptCust,.number=7,.name="vib tgt",.values={"ab","a","b","ab-Vca"}},  // added new vib targets
+    /*2*/ //{.type=ptStep,.number=spLFOShift,.name="vib ran",.values={"low","high"}},  //added new vib range
+    /*4*/ //{.type=ptCont,.number=cpModDelay,.name="mod dly"},
+    /*5*/ //{.type=ptCust,.number=2,.name="amp shp",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
+    /*6*/ //{.type=ptStep,.number=spBenderTarget,.name="bend tgt",.values={"off","Vco","Vcf","Vol","PW","Vco-b"}},  // added VcoB "Vol","PW",
+    /*7*/ //{.type=ptCont,.number=cpGlide,.name="glide"},
+    /*8*/ //{.type=ptCont,.number=cpUnisonDetune,.name="detune"},
+    /*9*/ //{.type=ptCont,.number=cpAmpVelocity,.name="amp Vel"},
+    
 };
 
 struct ui_s ui;
@@ -41,7 +56,6 @@ struct ui_s ui;
 extern void refreshFullState(void);
 extern void refreshPresetMode(void);
 extern void computeBenderCVs(void);
-extern int16_t getAdjustedBenderAmount(void);
 
 static void refreshPresetButton(p600Button_t button)
 {
@@ -90,7 +104,7 @@ static void refreshPresetButton(p600Button_t button)
 	case pbLFOPW:
 	case pbLFOFil:
 		currentPreset.steppedParameters[spLFOTargets]=
-			(currentPreset.steppedParameters[spLFOTargets]&(mtOnlyA|mtOnlyB)) | // keep those as-is
+			(currentPreset.steppedParameters[spLFOTargets]&(mtOnlyA|mtOnlyB|mtVCA)) | // keep those as-is
 			(scanner_buttonState(pbLFOFreq)?mtVCO:0) |
 			(scanner_buttonState(pbLFOPW)?mtPW:0) |
 			(scanner_buttonState(pbLFOFil)?mtVCF:0);
@@ -119,87 +133,146 @@ LOWERCODESIZE void refreshAllPresetButtons(void)
 		refreshPresetButton(b);
 }
 
-static LOWERCODESIZE void handleMiscAction(p600Button_t button)
+// Return 1 if an action has been completed which does not require any
+// further printouts (e.g. init patch).
+static int8_t changeMiscSetting(p600Button_t button)
 {
-	const char * chs[17]={"omni","ch1","ch2","ch3","ch4","ch5","ch6","ch7","ch8","ch9","ch10","ch11","ch12","ch13","ch14","ch15","ch16"};
-	static int8_t voice=0;
-	char s[20];
-	
-	
+	uint8_t v;
 
-	if(button==pb1) // midi receive channel
+	switch(button)
 	{
+	case pb1: // midi receive channel
 		settings.midiReceiveChannel=((settings.midiReceiveChannel+2)%17)-1;
 		settings_save();
-		
-		strcpy(s,chs[settings.midiReceiveChannel+1]);
-		strcat(s," recv");
-		
-		sevenSeg_scrollText(s,1);
-	}
-	else if(button==pb2) // midi send channel
-	{
+		return 0;
+            
+	case pb2: // midi send channel
 		settings.midiSendChannel=(settings.midiSendChannel+1)%16;
 		settings_save();
-		
-		strcpy(s,chs[settings.midiSendChannel+1]);
-		strcat(s," send");
-		
-		sevenSeg_scrollText(s,1);
-	}
-	else if(button==pb3) // pitch wheel calibration
-	{
+		return 0;
+            
+	case pb3: // pitch wheel calibration
 		settings.benderMiddle=potmux_getValue(ppPitchWheel);
 		settings_save();
-
-		synth_wheelEvent(getAdjustedBenderAmount(),0,1,0); // immediate update
-
+		synth_updateBender(); // immediate update
 		sevenSeg_scrollText("bender calibrated",1);
-	}
-	else if(button==pb4) // voice selection
-	{
-		voice=(voice+1)%SYNTH_VOICE_COUNT;
-
-		strcpy(s,"Vc-");
-		s[2]='1'+voice;
-		sevenSeg_scrollText(s,1);
-	}
-	else if(button==pb5) // selected voice defeat
-	{
-		if(settings.voiceMask&(1<<voice))
-		{
-			strcpy(s,"Vc- off");
-			settings.voiceMask&=~(1<<voice);
-		}
-		else
-		{
-			strcpy(s,"Vc- on");
-			settings.voiceMask|=(1<<voice);
-		}
-
+		return 1;
+            
+	case pb4: // voice selection
+		ui.voice=(ui.voice+1)%SYNTH_VOICE_COUNT;
+		return 0;
+            
+	case pb5: // selected voice defeat
+		settings.voiceMask^=(1<<ui.voice);
 		settings_save();
-
-		s[2]='1'+voice;
-		sevenSeg_scrollText(s,1);
 		refreshFullState();
-	}
-	else if(button==pb6) // preset dump
-	{
+		return 0;
+            
+	case pb6: // preset dump
 		midi_dumpPresets();
 		sevenSeg_scrollText("presets dumped",1);
 		refreshPresetMode();
 		refreshFullState();
-	}
-	else if(button==pb7) // reset to a basic patch
-	{
-		preset_loadDefault(1);
-		refreshFullState();
-	}
-	else if(button==pb8) // sync mode
-	{
+		return 1;
+
+    case pb7: // built in keyboard velocity added V2.24 JRS
+        settings.kbdVel=((settings.kbdVel+2)%17)-1;
+        //sevenSeg_scrollText("local keyboard velocity",1);
+        settings_save();
+        refreshFullState();
+        return 0;
+
+	case pb8: // sync mode
 		settings.syncMode=(settings.syncMode+1)%3;
 		settings_save();
+		refreshFullState();
+		return 0;
+            
+	case pb9: // spread / vcf limit
+		v=(settings.spread?1:0)+(settings.vcfLimit?2:0);
+		v=(v+1)%4;
+		settings.spread=v&1;
+		settings.vcfLimit=(v>>1)&1;
+		settings_save();
+		refreshFullState();
+		return 0;
+            
+	case pb0: // reset to a basic patch
+		preset_loadDefault(1);
+		ui.presetModified=1;
+		sevenSeg_scrollText("basic patch",1);
+		refreshFullState();
+		return 1;
+	default:
+		break;
+	}
+	return 0;
+    
+if(button==pb7) // built in keyboard velocity added V2.24 JRS added this because case statement is ignoring button press
+{
+    settings.kbdVel=((settings.kbdVel+2)%17)-1;
+    settings_save();
+    refreshFullState();
+    // may need to add a return 1 or 0
+}
+    
+}
+
+static LOWERCODESIZE void handleMiscAction(p600Button_t button)
+{
+	const char * chs[17]={"omni","ch1","ch2","ch3","ch4","ch5","ch6","ch7","ch8","ch9","ch10","ch11","ch12","ch13","ch14","ch15","ch16"};
+	char s[50];
+	int8_t nothingToDisplay=0;
+    const char * kbdVelList[9]={"0","15","31","47","63","79","95","111","127"}; // added in V2.24 for keyboard velocity From Tape + 7
+    
+	if (button==ui.prevMiscButton ||
+		button==pb4 || // pb4 is for voice selection, this one should be immediate
+		(button==pb5 && ui.prevMiscButton==pb4)) // pb5 voice defeat after pb4 should be immediate too
+		nothingToDisplay=changeMiscSetting(button);
+	ui.prevMiscButton=button;
+	if (nothingToDisplay)
+		return;
+	
+	switch(button)
+	{
+	case pb1: // midi receive channel
+		strcpy(s,chs[settings.midiReceiveChannel+1]);
+		strcat(s," recv");
+		sevenSeg_scrollText(s,1);
+		break;
+            
+	case pb2: // midi send channel
+		strcpy(s,chs[settings.midiSendChannel+1]);
+		strcat(s," send");
 		
+		sevenSeg_scrollText(s,1);
+		break;
+	case pb3: // pitch wheel calibration
+		sevenSeg_scrollText("again calibrates bender",1);
+		break;
+	case pb4: // voice selection
+	case pb5: // selected voice defeat
+		if(settings.voiceMask&(1<<ui.voice))
+			strcpy(s,"Vc- on");
+		else
+			strcpy(s,"Vc- off");
+
+		s[2]='1'+ui.voice;
+		sevenSeg_scrollText(s,1);
+		break;
+            
+	case pb6: // preset dump
+		sevenSeg_scrollText("again dumps presets",1);
+		break;
+            
+      // added in V2.24 for keyboard velocity From Tape + 7
+    case pb7: // local keyboard velocity
+        strcpy(s,kbdVelList[settings.kbdVel+16]);
+        strcat(s," kbd Vel ");
+        sevenSeg_scrollText(s,1);
+        break;
+            
+	case pb8: // sync mode
 		switch(settings.syncMode)
 		{
 			case smInternal:
@@ -212,14 +285,54 @@ static LOWERCODESIZE void handleMiscAction(p600Button_t button)
 				sevenSeg_scrollText("tape sync",1);
 				break;
 		}
+		break;
+            
+	case pb9: // spread / vcf limit
+		strcpy(s,"spread ");
 
-		refreshFullState();
+		if(settings.spread)
+		{
+			strcat(s,"on");
+		}
+		else
+		{
+			strcat(s,"off");
+		};
+		
+		strcat(s," / Vcf lim ");
+		
+		if(settings.vcfLimit)
+		{
+			strcat(s,"on");
+		}
+		else
+		{
+			strcat(s,"off");
+		};
+
+		sevenSeg_scrollText(s,1);
+		break;
+	case pb0: // reset to a basic patch
+		sevenSeg_scrollText("again sets basic patch",1);
+		break;
+	case pbTune:
+		ui.retuneLastNotePressedMode = !ui.retuneLastNotePressedMode;	
+		
+#ifdef DEBUG
+		print("retuneLastNotePressedMode=");
+		phex(ui.retuneLastNotePressedMode);
+		print("\n");
+#endif
+		
+		break;
+	default:
+		break;
 	}
 }
 
 static LOWERCODESIZE void setCustomParameter(int8_t num, int32_t data)
 {
-	int8_t br[]={2,3,5,12};
+	int8_t br[]={2,4,7,12};
 	int8_t mr[]={5,3,1,0};
 
 	switch(num)
@@ -228,11 +341,13 @@ static LOWERCODESIZE void setCustomParameter(int8_t num, int32_t data)
 		currentPreset.steppedParameters[spLFOShape]=(currentPreset.steppedParameters[spLFOShape]&1) | (data<<1);
 		break;
 	case 1: // lfo tgt
-		currentPreset.steppedParameters[spLFOTargets]&=~(mtOnlyA|mtOnlyB);
+		currentPreset.steppedParameters[spLFOTargets]&=~(mtOnlyA|mtOnlyB|mtVCA);
 		if(data==1)
 			currentPreset.steppedParameters[spLFOTargets]|=mtOnlyA;
 		else if(data==2)
 			currentPreset.steppedParameters[spLFOTargets]|=mtOnlyB;
+		else if(data==3)
+			currentPreset.steppedParameters[spLFOTargets]|=mtVCA;
 		break;					
 	case 2: // amp shape
 		currentPreset.steppedParameters[spAmpEnvExpo]=1-(data&1);
@@ -244,6 +359,7 @@ static LOWERCODESIZE void setCustomParameter(int8_t num, int32_t data)
 		break;
 	case 4: // bend range 
 		currentPreset.steppedParameters[spBenderSemitones]=br[data];
+		synth_updateBender(); // immediate update
 		break;
 	case 5: // mod range
 		currentPreset.steppedParameters[spModwheelShift]=mr[data];
@@ -254,18 +370,19 @@ static LOWERCODESIZE void setCustomParameter(int8_t num, int32_t data)
 static LOWERCODESIZE void displayUIParameter(int8_t num)
 {
 	int8_t i;
-	char s[20];
+	char s[21]; //added vel to filter attack   attvelocity was s[20]
 	const struct uiParam_s * prm = &uiParameters[ui.activeParamIdx];
 
 	ui_setNoActivePot();
 	
 	strcpy(s,prm->name);
-	strcat(s," = ");
+	strcat(s,"= ");
 	
 	switch(prm->type)
 	{
 	case ptCont:
-		ui.manualActivePotValue=currentPreset.continuousParameters[prm->number]>>8;
+		s[strlen(s)-1]='\0'; // remove trailing space
+		ui.lastActivePotValue=ui.adjustedLastActivePotValue=currentPreset.continuousParameters[prm->number];
 		break;
 	case ptStep:
 		strcat(s,prm->values[currentPreset.steppedParameters[prm->number]]);
@@ -320,11 +437,37 @@ static LOWERCODESIZE void handleSynthPage(p600Button_t button)
 	}
 }
 
+static LOWERCODESIZE void handleSequencerPage(p600Button_t button)
+{
+	// sequencer note input		
+	if(seq_getMode(0)==smRecording || seq_getMode(1)==smRecording)
+	{
+		uint8_t note;
+		switch(button)
+		{
+		case pb0:
+			note=SEQ_NOTE_CLEAR;
+			break;
+		case pb1:
+			note=SEQ_NOTE_UNDO;
+			break;
+		case pb2:
+			note=SEQ_NOTE_STEP;
+			break;
+		default:
+			note=ASSIGNER_NO_NOTE;
+		}
+		
+		if(note!=ASSIGNER_NO_NOTE)
+			seq_inputNote(note,1);
+	}
+}
+
 void ui_setNoActivePot(void)
 {
 	potmux_resetChanged();
 	ui.lastActivePot=ppNone;
-	ui.manualActivePotValue=-1;
+	ui.lastActivePotValue=-1;
 }
 
 FORCEINLINE void ui_setPresetModified(int8_t modified)
@@ -332,14 +475,9 @@ FORCEINLINE void ui_setPresetModified(int8_t modified)
 	ui.presetModified=modified;
 }
 
-FORCEINLINE int8_t ui_isPresetModified(void)
+void ui_checkIfDataPotChanged(void)
 {
-	return ui.presetModified;
-}
-
-void ui_dataPotChanged(void)
-{
-	ui.lastActivePot=potmux_lastChanged();
+	ui.lastActivePot = potmux_lastChanged() != ppNone ? potmux_lastChanged() : ui.lastActivePot;
 	
 	if(ui.lastActivePot!=ppSpeed)
 		return;
@@ -352,6 +490,10 @@ void ui_dataPotChanged(void)
 		struct uiParam_s prm;
 		
 		data=potmux_getValue(ppSpeed);
+		
+		if(data==ui.lastActivePotValue) // prevent slowdown caused by unwanted updates
+			return;
+		
 		prm=uiParameters[ui.activeParamIdx];
 		
 		switch(prm.type)
@@ -364,7 +506,8 @@ void ui_dataPotChanged(void)
 			ui_setNoActivePot();
 			
 			valCount=0;
-			while(valCount<4 && prm.values[valCount]!=NULL)
+			//while(valCount<4 && prm.values[valCount]!=NULL)
+            while(valCount<6 && prm.values[valCount]!=NULL) // changed to 5 for VCOB bender target and Pwm
 				++valCount;
 			
 			data=(data*valCount)>>16;
@@ -390,18 +533,46 @@ void ui_dataPotChanged(void)
 	}
 }
 
-
 void LOWERCODESIZE ui_handleButton(p600Button_t button, int pressed)
 {
+	int8_t recordOverride=0;
+
 	// button press might change current preset
 
 	refreshPresetButton(button);		
 
-	// tuning
-
-	if(!pressed && button==pbTune)
+	// sequencer
+	
+	if(pressed && (button==pbSeq1 || button==pbSeq2))
 	{
-		tuner_tuneSynth();
+		int8_t track=(button==pbSeq2)?1:0;
+		
+		switch(seq_getMode(track))
+		{
+		case smOff:
+			if(ui.digitInput==diStoreDecadeDigit)
+			{
+				// go directly to record mode when record was previously pressed
+				seq_setMode(track,smRecording);
+				// seq mode
+				ui.digitInput=diSequencer;
+			}
+			else
+			{
+				seq_setMode(track,ui.isShifted?smWaiting:smPlaying);
+			}
+			break;
+		case smRecording:
+			// cancel seq mode
+			ui.digitInput=(settings.presetMode)?diLoadDecadeDigit:diSynth;
+			// fall through
+		case smWaiting:
+			seq_setMode(track,smPlaying);
+			break;
+		case smPlaying:
+			seq_setMode(track,smOff);
+			break;
+		}
 	}
 	
 	// arp
@@ -430,7 +601,7 @@ void LOWERCODESIZE ui_handleButton(p600Button_t button, int pressed)
 	if(arp_getMode()!=amOff && pressed && button==pbRecord)
 	{
 		arp_setMode(arp_getMode(),arp_getHold()?0:1);
-		return; // override normal record action
+		recordOverride=1; // override normal record action
 	}
 
 	// assigner
@@ -467,13 +638,49 @@ void LOWERCODESIZE ui_handleButton(p600Button_t button, int pressed)
 		}
 	}
 
+	// shidted state (keyboard transposition, ...)
+	
+	if(button==pbFromTape)
+	{
+		if (pressed)
+		{
+			// If we're in double click mode, exit it when
+			// button pressed once. Otherwise enter double click
+			// mode if button pressed < 1 second ago, else it
+			// counts as first time, so set up double click timer.
+			if (ui.isDoubleClicked)
+				ui.isDoubleClicked=0;
+			else if (ui.doubleClickTimer)
+			// Button pressed < 1 second ago
+			{
+				ui.doubleClickTimer=0; // reset timer
+				ui.isDoubleClicked=1;
+			}
+			else
+				ui.doubleClickTimer = 63; // 1 second
+		}
+		ui.isShifted=pressed;
+		// reset Misc Settings to 'display only' whenever
+		// pbFromTape is pressed (or released).
+		ui.prevMiscButton=-1;
+	}
+	
 	// modes 
 	
 	if(pressed)
 	{
-		if(scanner_buttonState(pbFromTape))
+		if(scanner_buttonState(pbFromTape) && ((button>=pb0 && button<=pb9) || button==pbTune))
 		{
+			// Disable double click mode which might confuse
+			// user if he presses FROM TAPE within the double
+			// click interval while fiddling with the misc params.
+			ui.doubleClickTimer=0; // reset timer
+			ui.isDoubleClicked=0;
 			handleMiscAction(button);
+		}
+		else if(button==pbTune)
+		{
+			tuner_tuneSynth();	
 		}
 		else if(button==pbPreset)
 		{
@@ -486,18 +693,22 @@ void LOWERCODESIZE ui_handleButton(p600Button_t button, int pressed)
 			refreshPresetMode();
 			refreshFullState();
 		}
-		else if(button==pbRecord)
+		else if(button==pbRecord && !recordOverride)
 		{
-			if(ui.digitInput==diStoreDecadeDigit)
+			if(ui.digitInput==diStoreDecadeDigit || ui.digitInput==diStoreUnitDigit)
 			{
-				// cancel record
 				ui.digitInput=(settings.presetMode)?diLoadDecadeDigit:diSynth;
+				ui.presetAwaitingNumber=-1;	
 			}
 			else
 			{
 				// ask for digit
 				ui.digitInput=diStoreDecadeDigit;
 			}
+		}
+		else if(ui.digitInput==diSequencer)
+		{
+			handleSequencerPage(button);
 		}
 		else if(ui.digitInput==diSynth)
 		{
@@ -555,7 +766,15 @@ void ui_init(void)
 	ui.digitInput=diSynth;
 	ui.presetAwaitingNumber=-1;
 	ui.lastActivePot=ppNone;
-	ui.manualActivePotValue=-1;
+	ui.lastActivePotValue=-1;
 	ui.presetModified=1;
 	ui.activeParamIdx=-1;
+	ui.prevMiscButton=-1;
+}
+
+// Called at 63Hz
+void ui_update(void)
+{
+	if (ui.doubleClickTimer)
+		ui.doubleClickTimer--;
 }
