@@ -6,11 +6,11 @@
 #include "uart_6850.h"
 
 // increment this each time the binary format is changed
-#define STORAGE_VERSION 10
+#define STORAGE_VERSION 11
 
 #define STORAGE_MAGIC 0x006116a5
 
-#define SETTINGS_PAGE_COUNT 2
+#define SETTINGS_PAGE_COUNT 3
 #define SETTINGS_PAGE ((STORAGE_SIZE/STORAGE_PAGE_SIZE)-4)
 
 #define STORAGE_MAX_SIZE (SETTINGS_PAGE_COUNT*STORAGE_PAGE_SIZE)
@@ -43,6 +43,9 @@ const uint8_t steppedParametersBits[spCount] =
 	/*ModwheelTarget*/1,
 	/*VibTarget*/2,
 	/*AmpEnvSlow*/1,
+    /*VibShape*/3,
+    /*VibShift*/2,
+    /*VibTargets*/6,
 };
 
 struct settings_s settings;
@@ -196,7 +199,7 @@ LOWERCODESIZE int8_t settings_load(void)
 		settings.spread=0;
 		settings.vcfLimit=0;
 		settings.seqArpClock=HALF_RANGE;
-        settings.kbdVel=0x40; //added V2.24 JRS storing default keyboard velocity of 64
+        //settings.kbdVel=0x40; //added V2.24 JRS storing default keyboard velocity of 64
         settings.transpose=0x30; //added V2.24 JRS storing default transpose of 0
         
 		if (storage.version<1)
@@ -247,14 +250,14 @@ LOWERCODESIZE int8_t settings_load(void)
 
 		// v6
 		
-        settings.seqArpClock=storageRead16(); //rem'ed out to not store arp clock V2.24 JRS Aug 24 2020
+        settings.seqArpClock=storageRead16(); 
 
 		if (storage.version<7)
 			return 1;
 
         // v9
         
-        settings.kbdVel=storageRead16(); //adding local keyboard velocity V2.24 JRS
+        //settings.kbdVel=storageRead16(); //adding local keyboard velocity V2.24 JRS
         
         if (storage.version<9)
             return 1;
@@ -313,7 +316,7 @@ LOWERCODESIZE void settings_save(void)
         storageWrite16(settings.seqArpClock);
         
         // v9
-        storageWrite16(settings.kbdVel); //V2.24 JRS keyboard velocity
+       // storageWrite16(settings.kbdVel); //V2.24 JRS keyboard velocity
         
         // v10
         storageWrite16(settings.transpose); //V2.24 JRS keyboard transpose
@@ -390,12 +393,13 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
        // currentPreset.continuousParameters[cpNoiseLevel]=storageRead16();
         
         // v10
-        if (storage.version<10)
+    
+        // v11
+        if (storage.version<11)
             return 1;
-
-        for(cp=cpModDelay;cp<=cpUnisonDetune;++cp) // for Noise and skip clock recall
-            currentPreset.continuousParameters[cp]=storageRead16();
-        currentPreset.continuousParameters[cpNoiseLevel]=storageRead16();
+        
+        for(sp=spVibShape;sp<=spVibTargets;++sp)
+            currentPreset.steppedParameters[sp]=storageRead8();
         
 	}
 	
@@ -416,7 +420,7 @@ LOWERCODESIZE void preset_saveCurrent(uint16_t number)
 		for(cp=cpFreqA;cp<=cpFilVelocity;++cp)
 			storageWrite16(currentPreset.continuousParameters[cp]);
         
-		currentPreset.steppedParameters[holdPedal]=currentPreset.steppedParameters[spAmpEnvSlow];
+    currentPreset.steppedParameters[holdPedal]=currentPreset.steppedParameters[spAmpEnvSlow];
 
 		steppedParameter_t sp;
 		for(sp=spASaw;sp<=spChromaticPitch;++sp)
@@ -443,6 +447,11 @@ LOWERCODESIZE void preset_saveCurrent(uint16_t number)
        
         for(cp=cpModDelay;cp<=cpNoiseLevel;++cp)//for Noise
         storageWrite16(currentPreset.continuousParameters[cp]);
+        
+        // v11
+       
+        for(sp=spVibShape;sp<=spVibTargets;++sp)
+            storageWrite8(currentPreset.steppedParameters[sp]);
 
 		// this must stay last
 		storageFinishStore(number,1);

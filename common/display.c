@@ -44,6 +44,7 @@ void LOWERCODESIZE sevenSeg_scrollText(const char * text, int8_t times)
 	}
 }
 
+
 void LOWERCODESIZE sevenSeg_setAscii(char left, char right)
 {
 	display.sevenSegs[0]=map_to_seg7(&sevenSeg_map,left);

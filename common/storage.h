@@ -10,7 +10,8 @@
 
 typedef enum
 {
-	cpFreqA=0,cpVolA=1,cpAPW=2,
+	
+    cpFreqA=0,cpVolA=1,cpAPW=2,
 	cpFreqB=3,cpVolB=4,cpBPW=5,cpFreqBFine=6,
 	cpCutoff=7,cpResonance=8,cpFilEnvAmt=9,
 	cpFilRel=10,cpFilSus=11,cpFilDec=12,cpFilAtt=13,
@@ -24,7 +25,7 @@ typedef enum
 	cpVibFreq=26,cpVibAmt=27,
 	cpUnisonDetune=28,
 	cpSeqArpClock=29,
-    cpNoiseLevel=30, // for Noise V2.20
+    cpNoiseLevel=30, // for Noise V2.20  was CC46
     
 	// /!\ this must stay last
 	cpCount
@@ -56,6 +57,8 @@ typedef enum
 	spModwheelTarget=23,
 	spVibTarget=24,
 	spAmpEnvSlow=25,
+    spVibShape=26,spVibShift=27,spVibTargets=28, // Added V2.25 for Vib  cc=73-75
+    //spKbdVel=29,  // for local keyboard vel
 			
 	// /!\ this must stay last
 	spCount
@@ -76,7 +79,7 @@ struct settings_s
 	
 	int8_t syncMode;
     
-    int8_t kbdVel; //V2.24 JRS
+    //int8_t kbdVel; //V2.24 JRS
 	
 	int8_t spread;
 	int8_t vcfLimit;

@@ -25,7 +25,6 @@ const struct uiParam_s uiParameters[] =
 	/*8*/ {.type=ptCont,.number=cpUnisonDetune,.name="detune"},
 	/*9*/ {.type=ptCont,.number=cpAmpVelocity,.name="amp Vel"},
 	/*second press*/
-	//*0*/ {.type=ptCont,.number=cpSeqArpClock,.name="spd"}, // removed for Noise
     /*0*/ {.type=ptCont,.number=cpNoiseLevel,.name="noise"}, //for Noise
 	/*1*/ {.type=ptCust,.number=1,.name="lfo tgt",.values={"ab","a","b","ab-Vca"}},
 	/*2*/ {.type=ptStep,.number=spLFOShift,.name="lfo ran",.values={"low","high"}},
@@ -36,18 +35,17 @@ const struct uiParam_s uiParameters[] =
 	/*7*/ {.type=ptStep,.number=spAssignerPriority,.name="prio",.values={"last","low","high"}},	
 	/*8*/ {.type=ptStep,.number=spChromaticPitch,.name="pitch",.values={"free","semi","oct"}},
 	/*9*/ {.type=ptCont,.number=cpFilVelocity,.name="fil Vel"},
-    /*third press*/
-    
-    // /*0*/ {.type=ptCont,.number=cpAttVelocity,.name="fil Attack Vel"},   //attvelocity
-    /*1*/ //{.type=ptCust,.number=6,.name="vib shp",.values={"puls-tri","rnd-sin","nois-saw","step8-revsaw","seq-step4","bit_tri-bit_sine"}}, // Added vib LFO waveforms
-    /*1*/ //{.type=ptCust,.number=7,.name="vib tgt",.values={"ab","a","b","ab-Vca"}},  // added new vib targets
-    /*2*/ //{.type=ptStep,.number=spLFOShift,.name="vib ran",.values={"low","high"}},  //added new vib range
-    /*4*/ //{.type=ptCont,.number=cpModDelay,.name="mod dly"},
-    /*5*/ //{.type=ptCust,.number=2,.name="amp shp",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
-    /*6*/ //{.type=ptStep,.number=spBenderTarget,.name="bend tgt",.values={"off","Vco","Vcf","Vol","PW","Vco-b"}},  // added VcoB "Vol","PW",
-    /*7*/ //{.type=ptCont,.number=cpGlide,.name="glide"},
-    /*8*/ //{.type=ptCont,.number=cpUnisonDetune,.name="detune"},
-    /*9*/ //{.type=ptCont,.number=cpAmpVelocity,.name="amp Vel"},
+    /*third press*/ //added V2.25
+    /*0*/ {.type=ptCont,.number=cpSeqArpClock,.name="spd"},
+    /*1*/ {.type=ptStep,.number=spVibShape,.name="vib shp",.values={"puls","tri","rnd","sin","nois","saw","step8","revsaw","seq","step4","bit_tri","bit_sine"}}, // Added vib LFO waveforms ... add to storage
+    /*2*/ {.type=ptStep,.number=spVibTargets,.name="vib tgt",.values={"ab","a","b","ab-Vca","noise"}},  // added new vib targets .. add to storage
+    /*3*/ {.type=ptStep,.number=spVibShift,.name="vib ran",.values={"low","high"}},  //added new vib range   add spVibShift to ui.H and to storage
+    /*4*/ {.type=ptCont,.number=cpModDelay,.name="mod dly"},
+    /*5*/ {.type=ptCust,.number=2,.name="amp shp",.values={"fast-exp","fast-lin","slo-exp","slo-lin"}},
+    /*6*/ {.type=ptStep,.number=spBenderTarget,.name="bend tgt",.values={"off","Vco","Vcf","Vol","PW","Vco-b"}},
+    /*7*/ {.type=ptCont,.number=cpGlide,.name="glide"},
+    /*8*/ {.type=ptCont,.number=cpUnisonDetune,.name="detune"},
+    /*9*/ {.type=ptCont,.number=cpAmpVelocity,.name="amp Vel"},
     
 };
 
@@ -174,14 +172,14 @@ static int8_t changeMiscSetting(p600Button_t button)
 		refreshPresetMode();
 		refreshFullState();
 		return 1;
-
+/*
     case pb7: // built in keyboard velocity added V2.24 JRS
         settings.kbdVel=((settings.kbdVel+2)%17)-1;
         //sevenSeg_scrollText("local keyboard velocity",1);
         settings_save();
         refreshFullState();
         return 0;
-
+*/
 	case pb8: // sync mode
 		settings.syncMode=(settings.syncMode+1)%3;
 		settings_save();
@@ -208,14 +206,6 @@ static int8_t changeMiscSetting(p600Button_t button)
 	}
 	return 0;
     
-if(button==pb7) // built in keyboard velocity added V2.24 JRS added this because case statement is ignoring button press
-{
-    settings.kbdVel=((settings.kbdVel+2)%17)-1;
-    settings_save();
-    refreshFullState();
-    // may need to add a return 1 or 0
-}
-    
 }
 
 static LOWERCODESIZE void handleMiscAction(p600Button_t button)
@@ -223,7 +213,7 @@ static LOWERCODESIZE void handleMiscAction(p600Button_t button)
 	const char * chs[17]={"omni","ch1","ch2","ch3","ch4","ch5","ch6","ch7","ch8","ch9","ch10","ch11","ch12","ch13","ch14","ch15","ch16"};
 	char s[50];
 	int8_t nothingToDisplay=0;
-    const char * kbdVelList[9]={"0","15","31","47","63","79","95","111","127"}; // added in V2.24 for keyboard velocity From Tape + 7
+    //const char * kbdVelList[9]={"0","15","31","47","63","79","95","111","127"}; // added in V2.24 for keyboard velocity From Tape + 7 ... may not need
     
 	if (button==ui.prevMiscButton ||
 		button==pb4 || // pb4 is for voice selection, this one should be immediate
@@ -264,13 +254,14 @@ static LOWERCODESIZE void handleMiscAction(p600Button_t button)
 	case pb6: // preset dump
 		sevenSeg_scrollText("again dumps presets",1);
 		break;
-            
+   /*
       // added in V2.24 for keyboard velocity From Tape + 7
     case pb7: // local keyboard velocity
         strcpy(s,kbdVelList[settings.kbdVel+16]);
         strcat(s," kbd Vel ");
         sevenSeg_scrollText(s,1);
         break;
+    */
             
 	case pb8: // sync mode
 		switch(settings.syncMode)
@@ -364,13 +355,14 @@ static LOWERCODESIZE void setCustomParameter(int8_t num, int32_t data)
 	case 5: // mod range
 		currentPreset.steppedParameters[spModwheelShift]=mr[data];
 		break;
+   
 	}
 }
 
 static LOWERCODESIZE void displayUIParameter(int8_t num)
 {
 	int8_t i;
-	char s[21]; //added vel to filter attack   attvelocity was s[20]
+	char s[20]; // was s[20]
 	const struct uiParam_s * prm = &uiParameters[ui.activeParamIdx];
 
 	ui_setNoActivePot();
@@ -418,7 +410,10 @@ static LOWERCODESIZE void handleSynthPage(p600Button_t button)
 		if (prev==new)
 			ui.activeParamIdx+=10;
 		else if (prev==new+10)
-			ui.activeParamIdx-=10;
+            ui.activeParamIdx+=10;// add new menu options V2.25
+			// ui.activeParamIdx-=10; // remmed out for new menu items
+        else if (prev==new+20)// maybe add new menu options V2.25
+            ui.activeParamIdx-=20;// added new menu options V2.25
 		else
 			ui.activeParamIdx=new;
 		ui.previousData=-1;
@@ -507,7 +502,7 @@ void ui_checkIfDataPotChanged(void)
 			
 			valCount=0;
 			//while(valCount<4 && prm.values[valCount]!=NULL)
-            while(valCount<6 && prm.values[valCount]!=NULL) // changed to 5 for VCOB bender target and Pwm
+            while(valCount<12 && prm.values[valCount]!=NULL) // changed to 5 for VCOB bender target and Pwm  //V2.25 changed to valcount<12 from valcount<6
 				++valCount;
 			
 			data=(data*valCount)>>16;

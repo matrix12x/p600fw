@@ -111,7 +111,6 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	p.continuousParameters[cpGlide]=(zp->glide)?(0xc000+(zp->glide<<10)):0;
 	p.continuousParameters[cpAmpVelocity]=0;
 	p.continuousParameters[cpFilVelocity]=0;
-   // p.continuousParameters[cpAttVelocity]=0;  //for filter attack velocity
     p.continuousParameters[cpNoiseLevel]=0;// for Noise
 
 	p.steppedParameters[spASaw]=zp->sawA;
@@ -137,6 +136,11 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	p.steppedParameters[spBenderTarget]=modVCO;
 	p.steppedParameters[spModwheelShift]=2;
 	p.steppedParameters[spChromaticPitch]=1;
+
+    // added 2.25 JRS
+    p.steppedParameters[spVibShape]=1; // may need to revise because no switch
+    p.steppedParameters[spVibShift]=0;
+    p.steppedParameters[spVibTargets]=0; // my need to change because no switch
 
 	// save it
 	

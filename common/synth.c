@@ -43,6 +43,7 @@
 #define BIT_INTPUT_TAPE_IN 0x01
 
 uint8_t tempBuffer[TEMP_BUFFER_SIZE]; // general purpose chunk of RAM
+uint16_t prevMVol,newMVol;
 
 const p600Pot_t continuousParameterToPot[cpCount]=
 {
@@ -83,7 +84,7 @@ struct synth_s
 	int16_t benderCVs[pcFil6-pcOsc1A+1];
 	int16_t benderVolumeCV;
     int16_t benderPW;// BenderPW
-    //int16_t MY_VELOCITY; //added V2.24 JRS
+   // int16_t MY_VELOCITY; //added V2.24 JRS added back 2.25
 
 	int16_t glideAmount;
 	int8_t gliding;
@@ -311,11 +312,6 @@ static inline int16_t getAdjustedBenderAmount(void)
 }
 
 
-/* void synth_updateLocalKbdVelocity(void) // added V2.24 JRS for keyboard velocity
-{
-    MY_VELOCITY = 512 * settings.kbdVel // added V2.24 JRS
-} */
-
 void synth_updateBender(void)
 {
 	bendDeadband.middle=settings.benderMiddle;
@@ -538,18 +534,25 @@ static void refreshLfoSettings(void)
 {
 	lfoShape_t shape;
 	uint8_t shift;
-	uint16_t mwAmt,lfoAmt,vibAmt,dlyAmt;
+    uint16_t mwAmt,lfoAmt,vibAmt,dlyAmt;
 	uint32_t elapsed;
 
 	shape=currentPreset.steppedParameters[spLFOShape];
 	shift=1+currentPreset.steppedParameters[spLFOShift]*3;
-
 	lfo_setShape(&synth.lfo,shape);
 	lfo_setSpeedShift(&synth.lfo,shift);
-	
+    
+    // Added V2.25 to set shape and range of Vibrato LFO
+    shape=currentPreset.steppedParameters[spVibShape];
+    shift=1+currentPreset.steppedParameters[spVibShift]*3;
+    lfo_setShape(&synth.vibrato,shape);
+    lfo_setSpeedShift(&synth.vibrato,shift);
+    
+    
 	// wait modulationDelayTickCount then progressively increase over
 	// modulationDelayTickCount time, following an exponential curve
 	dlyAmt=0;
+    
 	if(synth.modulationDelayStart!=UINT32_MAX)
 	{
 		if(currentPreset.continuousParameters[cpModDelay]<POT_DEAD_ZONE)
@@ -574,6 +577,8 @@ static void refreshLfoSettings(void)
 	vibAmt=currentPreset.continuousParameters[cpVibAmt]>>2;
 	vibAmt=(vibAmt<POT_DEAD_ZONE)?0:(vibAmt-POT_DEAD_ZONE);
 
+
+    
 	if(currentPreset.steppedParameters[spModwheelTarget]==0) // targeting lfo?
 	{
 		lfo_setCVs(&synth.lfo,
@@ -582,7 +587,8 @@ static void refreshLfoSettings(void)
 		lfo_setCVs(&synth.vibrato,
 				 currentPreset.continuousParameters[cpVibFreq],
 				 scaleU16U16(vibAmt,dlyAmt));
-	}
+
+    }
 	else 
 	{
 		lfo_setCVs(&synth.lfo,
@@ -591,6 +597,7 @@ static void refreshLfoSettings(void)
 		lfo_setCVs(&synth.vibrato,
 				currentPreset.continuousParameters[cpVibFreq],
 				satAddU16U16(vibAmt,mwAmt));
+ 
 	}
 }
 
@@ -672,14 +679,6 @@ static void refreshSevenSeg(void)
 		led_set(plRecord,b,b);
 	}
 }
-/*
-void refreshTranspose(void)
-{
-    // recall stored transpose V2.24 JRS
-        if(settings.transpose)
-            synth.transpose=settings.transpose;
-}
-*/
 
 void refreshFilterMaxCV(void)
 {
@@ -713,7 +712,7 @@ static void refreshPresetPots(int8_t force)
 {
 	continuousParameter_t cp;
 	
-	for(cp=0;cp<(cpCount-1);++cp)// -1  for Noise. add 1 element [cpNoiselevel] in storage.h, [enum continuousParameter_t]
+	for(cp=0;cp<(cpCount-1);++cp)// -1 for Noise. add 1 element [cpNoiselevel] in storage.h, [enum continuousParameter_t]  changed to -4
 		if((continuousParameterToPot[cp]!=ppNone) && (force || continuousParameterToPot[cp]==ui.lastActivePot || potmux_hasChanged(continuousParameterToPot[cp])))
 		{
 			p600Pot_t pp=continuousParameterToPot[cp];
@@ -869,9 +868,10 @@ void synth_init(void)
 
 	lfo_init(&synth.lfo);
 	lfo_init(&synth.vibrato);
-	lfo_setShape(&synth.vibrato,lsTri);
-	lfo_setSpeedShift(&synth.vibrato,4);
-	
+   
+	//lfo_setShape(&synth.vibrato,lsTri);
+	//lfo_setSpeedShift(&synth.vibrato,4);
+    
 	// go in scaling adjustment mode if needed
 	
 	if(io_read(0x9)&16)
@@ -909,12 +909,24 @@ void synth_init(void)
 	// load last preset & do a full refresh
 	
 	refreshPresetMode();
+    sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE); // aded so on startup the volume is normal
+    
 	refreshFullState();
 	computeTunedCVs(-1,-1); // force init CV's for all voices
 	
 	// a nice welcome message, and we're ready to go :)
-	
-	sevenSeg_scrollText("GliGli's P600 upgrade Noise "VERSION,1); //for Noise
+	sevenSeg_scrollText("GliGli's P600 upgrade Noise mod "VERSION,1); //for Noise
+}
+
+void synth_refresh_MVol_Knob(void)
+{
+    // determine if Mvol pot was touched
+    newMVol=potmux_getValue(ppMVol);
+    if (prevMVol!=newMVol){
+        sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE);
+        prevMVol=newMVol=potmux_getValue(ppMVol);
+    }
+    
 }
 
 void synth_update(void)
@@ -987,7 +999,8 @@ void synth_update(void)
 		sh_setCV(pcVolA,currentPreset.continuousParameters[cpVolA],SH_FLAG_IMMEDIATE);
 		sh_setCV(pcVolB,currentPreset.continuousParameters[cpVolB],SH_FLAG_IMMEDIATE);
             // maybe set a flag when volume pot or pitchbendVolume is changed and if the flag is high then do this Command.
-		sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE); // revise this to implement midi volume - maybe volume should not be set like this immediately... maybe store?
+        synth_refresh_MVol_Knob();
+		//sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE); // revise this to implement midi volume - maybe volume should not be set like this immediately... maybe store?
         
 		break;
 	case 3:
@@ -1025,7 +1038,7 @@ void synth_uartInterrupt(void)
 void synth_timerInterrupt(void)
 {
 	int32_t va,vf;
-	int16_t pitchALfoVal,pitchBLfoVal,filterLfoVal,filEnvAmt,oscEnvAmt;
+	int16_t pitchALfoVal,pitchBLfoVal,filterLfoVal,filEnvAmt,oscEnvAmt,noiseLfoVal;
 	uint16_t ampLfoVal;
 	int8_t v,hz63,hz250;
 
@@ -1035,8 +1048,11 @@ void synth_timerInterrupt(void)
 	
 	lfo_update(&synth.lfo);
 	
-	pitchALfoVal=pitchBLfoVal=synth.vibrato.output;
+    pitchALfoVal=pitchBLfoVal=0; // may have to rem out and switch back to the next line
+    //pitchALfoVal=pitchBLfoVal=synth.vibrato.output; // remed out for vibrato target
+    
 	filterLfoVal=0;
+    noiseLfoVal=0; // added modulate noise
 	ampLfoVal=UINT16_MAX;
 	
 	if(currentPreset.steppedParameters[spLFOTargets]&mtVCO)
@@ -1053,6 +1069,30 @@ void synth_timerInterrupt(void)
 	if(currentPreset.steppedParameters[spLFOTargets]&mtVCA)
 		ampLfoVal=synth.lfo.output+(UINT16_MAX-(synth.lfo.levelCV>>1));
 
+    // try this out..... to set targets  V2.25
+    switch(currentPreset.steppedParameters[spVibTargets])
+    {
+        case 0:
+            pitchALfoVal+=pitchBLfoVal=synth.vibrato.output>>1;  // had to add + or LFO 1 to VCO did not work
+            break;
+        case 1:
+            pitchALfoVal+=synth.vibrato.output>>1;
+            break;
+        case 2:
+            pitchBLfoVal+=synth.vibrato.output>>1;
+            break;
+        case 3:
+            ampLfoVal+=synth.vibrato.output+(UINT16_MAX-(synth.vibrato.levelCV));   // added +
+            break;
+        case 4:
+            noiseLfoVal+=synth.vibrato.output;  //added v2.25 to modulate noise level using vibe
+            //sh_setCV(pcExtFil,currentPreset.continuousParameters[cpNoiseLevel] / 3,SH_FLAG_IMMEDIATE);
+            sh_setCV(pcExtFil,satAddU16S16(currentPreset.continuousParameters[cpNoiseLevel],noiseLfoVal),SH_FLAG_IMMEDIATE);
+            break;
+    }
+    
+
+    
 	// global env computations
 	
 	vf=currentPreset.continuousParameters[cpFilEnvAmt];
@@ -1171,11 +1211,11 @@ void synth_keyEvent(uint8_t key, int pressed)
 			char s[16]="trn = ";
 			
 			synth.transpose=(int8_t)key-SCANNER_C2;
-            
+/*
             settings.transpose=synth.transpose; //added V2.24 save transpose setting
             settings_save();// added V2.24 save transpose setting
             refreshFullState();// added V2.24 save transpose setting
-         
+  */
 			seq_setTranspose(synth.transpose);
 			arp_setTranspose(synth.transpose);
 			
@@ -1211,15 +1251,13 @@ void synth_keyEvent(uint8_t key, int pressed)
 			}
 
 			// set velocity to half (corresponding to MIDI value 64)
-			//assigner_assignNote(key+synth.transpose,pressed,HALF_RANGE,1);
-            //assigner_assignNote(key+synth.transpose,pressed,MY_VELOCITY,1); // revised per RDP velocity code
-            assigner_assignNote(key+synth.transpose,pressed,(512 * settings.kbdVel),1); // revised per RDP velocity code
+			assigner_assignNote(key+synth.transpose,pressed,HALF_RANGE,1);
+
             
 
 			// pass to MIDI out
-			//midi_sendNoteEvent(key+synth.transpose,pressed,HALF_RANGE);
-           // midi_sendNoteEvent(key+synth.transpose,pressed,MY_VELOCITY);// revised per RDP velocity code
-             midi_sendNoteEvent(key+synth.transpose,pressed,(512 * settings.kbdVel));// revised per RDP velocity code
+			midi_sendNoteEvent(key+synth.transpose,pressed,HALF_RANGE);
+
             
 		}
 		else
@@ -1257,9 +1295,6 @@ void synth_assignerEvent(uint8_t note, int8_t gate, int8_t voice, uint16_t veloc
 		adsr_setCVs(&synth.filEnvs[voice],0,0,0,0,(UINT16_MAX-velAmt)+scaleU16U16(velocity,velAmt),0x10);
 		velAmt=currentPreset.continuousParameters[cpAmpVelocity];
 		adsr_setCVs(&synth.ampEnvs[voice],0,0,0,0,(UINT16_MAX-velAmt)+scaleU16U16(velocity,velAmt),0x10);
-        //velAmt=currentPreset.continuousParameters[cpAttVelocity];    // velocity to filter attack
-        //fa=satAddU16S16(currentPreset.continuousParameters[cpAmpAtt],velAmt);
-        //adsr_setCVs(&synth.filEnvs[voice],fa,0,0,0,0,0x0f);
     
 	}
 	
@@ -1340,7 +1375,9 @@ void synth_wheelEvent(int16_t bend, uint16_t modulation, uint8_t mask, int8_t ou
 void synth_volEvent(uint16_t value) // Added for MIDI Volume V2.24 JRS
 {
     sh_setCV(pcMVol,value,SH_FLAG_IMMEDIATE);
+    return;
 }
+
 
 void synth_realtimeEvent(uint8_t midiEvent)
 {

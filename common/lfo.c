@@ -234,7 +234,7 @@ inline void lfo_update(struct lfo_s * l)
     // quantitized triangle and Sine added version 2.22
     case lsbitTri:
         l->rawOutput=l->phase>>8;
-        l->rawOutput=keep_bits_from_16(l->rawOutput, 4);
+        l->rawOutput=keep_bits_from_16(l->rawOutput, 3);
         break;
     case lsbitSine:
         l->rawOutput=computeShape(l->phase,sineShape,1);
@@ -269,7 +269,7 @@ inline void lfo_update(struct lfo_s * l)
 
 	// compute output
 	
-	l->output=scaleU16S16(l->levelCV,(int32_t)l->rawOutput+INT16_MIN); //REM'ed out based on NEW LFO below
+	l->output=scaleU16S16(l->levelCV,(int32_t)l->rawOutput+INT16_MIN); // code below causes UI slowdown
 
     /*   this is for the SEQ waveform
      int32_t o;

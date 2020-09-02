@@ -17,7 +17,7 @@
 #define MAX_SYSEX_SIZE TEMP_BUFFER_SIZE
 
 #define MIDI_BASE_STEPPED_CC 48
-#define MIDI_BASE_COARSE_CC 16
+#define MIDI_BASE_COARSE_CC 16 // V2.25 moved from 16 to 13 to accomodate LFO3 parameters
 #define MIDI_BASE_FINE_CC 80
 
 static MidiDevice midi;
@@ -285,7 +285,31 @@ static void midi_ccEvent(MidiDevice * device, uint8_t channel, uint8_t control, 
 		assigner_holdEvent(value);
 		return;
 	}
-	
+    else if(control==120) // All Sound off  V2.25
+    {
+        if (value=127)
+        {
+        int8_t i;
+        for (i=0;6;++i)
+        {
+        assigner_voiceDone(i);
+        }
+           }
+        return;
+    }
+    else if(control==122) // All Local ON/OFF  V2.25
+    {
+       //0=OFF  127=local ON need to add code maybe add a static local on/off flag
+        
+        return;
+    }
+    else if(control==123) // All Notes off  V2.25
+    {
+        if (value=127)
+            assigner_allKeysOff();
+        return;
+    }
+    
 	if(!settings.presetMode) // in manual mode CC changes would only conflict with pot scans...
 		return;
 	
