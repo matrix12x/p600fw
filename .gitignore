@@ -3,3 +3,4 @@
 *.d
 *.bak
 *.ppu
+.DS_Store
