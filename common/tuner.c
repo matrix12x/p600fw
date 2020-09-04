@@ -505,6 +505,8 @@ LOWERCODESIZE void tuner_tuneSynth(void)
 		display_clear();
 		
 		settings_save();
+        
+        sh_setCV(pcMVol,20000,0);// v 2.26 set volume to max after tune
 	}
 }
 

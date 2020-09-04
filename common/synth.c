@@ -43,7 +43,7 @@
 #define BIT_INTPUT_TAPE_IN 0x01
 
 uint8_t tempBuffer[TEMP_BUFFER_SIZE]; // general purpose chunk of RAM
-uint16_t prevMVol,newMVol;
+uint16_t prevMVol,newMVol,tempmVol;
 
 const p600Pot_t continuousParameterToPot[cpCount]=
 {
@@ -317,6 +317,11 @@ void synth_updateBender(void)
 	bendDeadband.middle=settings.benderMiddle;
 	precalcDeadband(&bendDeadband);
 	synth_wheelEvent(getAdjustedBenderAmount(),0,1,0);
+}
+
+void synth_updateMasterVolume(void)
+{
+ sh_setCV(pcMVol,potmux_getValue(ppMVol),SH_FLAG_IMMEDIATE); // V2.26B
 }
 
 void computeBenderCVs(void)
@@ -909,7 +914,7 @@ void synth_init(void)
 	// load last preset & do a full refresh
 	
 	refreshPresetMode();
-    sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE); // aded so on startup the volume is normal
+    sh_setCV(pcMVol,potmux_getValue(ppMVol),SH_FLAG_IMMEDIATE); // V2.25 added so on startup the volume is normal
     
 	refreshFullState();
 	computeTunedCVs(-1,-1); // force init CV's for all voices
@@ -923,10 +928,11 @@ void synth_refresh_MVol_Knob(void)
     // determine if Mvol pot was touched
     newMVol=potmux_getValue(ppMVol);
     if (prevMVol!=newMVol){
-        sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE);
-        prevMVol=newMVol=potmux_getValue(ppMVol);
-    }
-    
+        sh_setCV(pcMVol,satAddU16S16(newMVol,synth.benderVolumeCV),SH_FLAG_IMMEDIATE);
+        prevMVol=newMVol=potmux_getValue(ppMVol); //added V2.26B volume seemed to fade over time
+        tempmVol=potmux_getValue(ppMVol);
+    } else
+        sh_setCV(pcMVol,satAddU16S16(tempmVol,synth.benderVolumeCV),SH_FLAG_IMMEDIATE);
 }
 
 void synth_update(void)
@@ -998,7 +1004,7 @@ void synth_update(void)
 		// 'fixed' CVs
 		sh_setCV(pcVolA,currentPreset.continuousParameters[cpVolA],SH_FLAG_IMMEDIATE);
 		sh_setCV(pcVolB,currentPreset.continuousParameters[cpVolB],SH_FLAG_IMMEDIATE);
-            // maybe set a flag when volume pot or pitchbendVolume is changed and if the flag is high then do this Command.
+            // set a flag when volume pot or pitchbendVolume is changed and if the flag is high then do this Command
         synth_refresh_MVol_Knob();
 		//sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE); // revise this to implement midi volume - maybe volume should not be set like this immediately... maybe store?
         
@@ -1048,7 +1054,8 @@ void synth_timerInterrupt(void)
 	
 	lfo_update(&synth.lfo);
 	
-    pitchALfoVal=pitchBLfoVal=0; // may have to rem out and switch back to the next line
+    pitchALfoVal=0;
+    pitchBLfoVal=0; // may have to rem out and switch back to the next line
     //pitchALfoVal=pitchBLfoVal=synth.vibrato.output; // remed out for vibrato target
     
 	filterLfoVal=0;
@@ -1057,11 +1064,13 @@ void synth_timerInterrupt(void)
 	
 	if(currentPreset.steppedParameters[spLFOTargets]&mtVCO)
 	{
-		if(!(currentPreset.steppedParameters[spLFOTargets]&mtOnlyB))
-			pitchALfoVal+=synth.lfo.output>>1;
-		if(!(currentPreset.steppedParameters[spLFOTargets]&mtOnlyA))
-			pitchBLfoVal+=synth.lfo.output>>1;
-	}
+     if(!(currentPreset.steppedParameters[spLFOTargets]&mtOnlyB))
+         pitchALfoVal+=synth.lfo.output>>1;
+        
+     if(!(currentPreset.steppedParameters[spLFOTargets]&mtOnlyA))
+         pitchBLfoVal+=synth.lfo.output>>1;
+  }
+
 
 	if(currentPreset.steppedParameters[spLFOTargets]&mtVCF)
 		filterLfoVal=synth.lfo.output;
@@ -1069,11 +1078,12 @@ void synth_timerInterrupt(void)
 	if(currentPreset.steppedParameters[spLFOTargets]&mtVCA)
 		ampLfoVal=synth.lfo.output+(UINT16_MAX-(synth.lfo.levelCV>>1));
 
-    // try this out..... to set targets  V2.25
+    //  to set Vibrato targets  V2.25
     switch(currentPreset.steppedParameters[spVibTargets])
     {
         case 0:
-            pitchALfoVal+=pitchBLfoVal=synth.vibrato.output>>1;  // had to add + or LFO 1 to VCO did not work
+            pitchALfoVal+=synth.vibrato.output>>1;
+            pitchBLfoVal+=synth.vibrato.output>>1;  // had to add the + to "pitchALfoVal+" or LFO 1 to VCO did not work
             break;
         case 1:
             pitchALfoVal+=synth.vibrato.output>>1;
@@ -1086,7 +1096,6 @@ void synth_timerInterrupt(void)
             break;
         case 4:
             noiseLfoVal+=synth.vibrato.output;  //added v2.25 to modulate noise level using vibe
-            //sh_setCV(pcExtFil,currentPreset.continuousParameters[cpNoiseLevel] / 3,SH_FLAG_IMMEDIATE);
             sh_setCV(pcExtFil,satAddU16S16(currentPreset.continuousParameters[cpNoiseLevel],noiseLfoVal),SH_FLAG_IMMEDIATE);
             break;
     }
@@ -1374,6 +1383,7 @@ void synth_wheelEvent(int16_t bend, uint16_t modulation, uint8_t mask, int8_t ou
 
 void synth_volEvent(uint16_t value) // Added for MIDI Volume V2.24 JRS
 {
+    tempmVol=value;
     sh_setCV(pcMVol,value,SH_FLAG_IMMEDIATE);
     return;
 }

@@ -57,8 +57,7 @@ typedef enum
 	spModwheelTarget=23,
 	spVibTarget=24,
 	spAmpEnvSlow=25,
-    spVibShape=26,spVibShift=27,spVibTargets=28, // Added V2.25 for Vib  cc=73-75
-    //spKbdVel=29,  // for local keyboard vel
+    spVibShape=26,spVibShift=27,spVibTargets=28, // Added V2.25 for Vib  cc=74-76
 			
 	// /!\ this must stay last
 	spCount

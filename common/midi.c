@@ -287,7 +287,7 @@ static void midi_ccEvent(MidiDevice * device, uint8_t channel, uint8_t control, 
 	}
     else if(control==120) // All Sound off  V2.25
     {
-        if (value=127)
+        if (value==127)
         {
         int8_t i;
         for (i=0;6;++i)
@@ -305,7 +305,7 @@ static void midi_ccEvent(MidiDevice * device, uint8_t channel, uint8_t control, 
     }
     else if(control==123) // All Notes off  V2.25
     {
-        if (value=127)
+        if (value==127)
             assigner_allKeysOff();
         return;
     }

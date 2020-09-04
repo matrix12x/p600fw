@@ -26,7 +26,8 @@ History
 - V2.22 JS - added 4bit Triangle and 6bit Sine
 - V2.23 JS - fixed patch compatibility bug introduced in V 2.22
 - V2.24 JS - reverted polymod bug to RC1 behavior 
-- V2.25 JS - added new vibrato waveforms
+- V2.25 JS - added new vibrato waveforms and Vibrato targets
+- V2.26B JS - fixed post “Tune” volume bug introduced in V2.25
 
 V2.25 includes -
 LFO has 6 new waveforms:
@@ -35,7 +36,7 @@ New Pitch Bender targets:PW(VCO A), and VCO B only
 
 New noise source setting control. Pressing "to tape" 0 a second time lets you adjust the VCF CV input level and store it with a patch. I modified my P600 to add a noise source and use this parameter to adjust the noise source per patch, hence in the UI this displays as "noise". However, in an unmodified Prophet 600, this parameter controls the VCF CV input level.
 
-Vibrato now has: 1) all LFO waveforms (CC73), 2) high and low range (CC74), and 3) target AB, A, B, VCA and Noise level (CC75)
+Vibrato now has: 1) all LFO waveforms (CC74), 2) high and low range (CC75), and 3) target AB, A, B, VCA and Noise level (CC76)
 
 Added channel aftertouch (e.g., channel pressure). If you use an external controller that has aftertouch controlling the Prophet 600, the Prophet 600 now uses this MIDI channel aftertouch data to modulate whatever the Mod-wheel is modulating. For example, I used it to apply vibrato to notes.
 

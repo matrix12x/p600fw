@@ -6,7 +6,7 @@
 #include "hardware.h"
 
 //#define DEBUG
-#define RELEASE "Ver 2.24 jrs"
+#define RELEASE "Ver 2.26b jrs"
 
 #define UART_USE_HW_INTERRUPT // this needs an additional wire that goes from pin C4 to pin E4
 
@@ -43,7 +43,7 @@
 #define HALF_RANGE (FULL_RANGE/2+1)
 #define HALF_RANGE_L (65536UL*HALF_RANGE) // i.e. HALF_RANGE<<16, as uint32_t
 //#define MY_VELOCITY 100 * 512 // added per RDP keyboard velocity code REM this out to change to a variable
-// MY_VELOCITY= 512 * settings.kbdVel // added V2.24 JRS
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +80,7 @@ typedef enum
 
 typedef enum
 {
-	pb0=0,pb1,pb2,pb3,pb4,pb5,pb6,pb7=7,                                            
+	pb0=0,pb1,pb2,pb3,pb4,pb5,pb6,pb7,
 	pb8=8,pb9,pbArpUD,pbArpAssign,pbPreset,pbRecord,pbToTape,pbFromTape,          
 	pbSeq1=16,pbSeq2,pbTune,                                                      
 	pbASqr=24,pbBSqr,pbFilFull,pbFilHalf,pbLFOShape,pbLFOFreq,pbLFOPW,pbLFOFil,   
@@ -109,6 +109,7 @@ void synth_uartEvent(uint8_t data);
 void synth_wheelEvent(int16_t bend, uint16_t modulation, uint8_t mask, int8_t outputToMidi);
 void synth_volEvent(uint16_t value);//to add MIDI volume V2.24JRS
 void synth_updateBender(void);
+void synth_updateMasterVolume(void); // to fix volume bug in 2.25
 void synth_realtimeEvent(uint8_t midiEvent);
 
 void synth_init(void);

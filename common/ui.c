@@ -10,6 +10,7 @@
 #include "display.h"
 #include "potmux.h"
 #include "midi.h"
+//#include "sh.h"  //added V2.26 o fix volume bug after tune may have caused massive crash
 
 const struct uiParam_s uiParameters[] =
 {
@@ -307,7 +308,8 @@ static LOWERCODESIZE void handleMiscAction(p600Button_t button)
 		sevenSeg_scrollText("again sets basic patch",1);
 		break;
 	case pbTune:
-		ui.retuneLastNotePressedMode = !ui.retuneLastNotePressedMode;	
+		ui.retuneLastNotePressedMode = !ui.retuneLastNotePressedMode;
+       
 		
 #ifdef DEBUG
 		print("retuneLastNotePressedMode=");
@@ -675,7 +677,8 @@ void LOWERCODESIZE ui_handleButton(p600Button_t button, int pressed)
 		}
 		else if(button==pbTune)
 		{
-			tuner_tuneSynth();	
+			tuner_tuneSynth();
+            synth_updateMasterVolume(); // V2.26 to fix tuner volume issue
 		}
 		else if(button==pbPreset)
 		{
