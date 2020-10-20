@@ -28,6 +28,7 @@ History
 - V2.24 JS - reverted polymod bug to RC1 behavior 
 - V2.25 JS - added new vibrato waveforms and Vibrato targets
 - V2.26B JS - fixed post “Tune” volume bug introduced in V2.25
+- V2.28 JS - added polymod VCO A, VCO B, VCO A-B targets
 
 V2.25 includes -
 LFO has 6 new waveforms:
