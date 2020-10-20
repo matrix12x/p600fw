@@ -6,7 +6,7 @@
 #include "hardware.h"
 
 //#define DEBUG
-#define RELEASE "Ver 2.26b jrs"
+#define RELEASE "Ver 2.28 jrs"
 
 #define UART_USE_HW_INTERRUPT // this needs an additional wire that goes from pin C4 to pin E4
 
@@ -42,8 +42,6 @@
 #define FULL_RANGE UINT16_MAX
 #define HALF_RANGE (FULL_RANGE/2+1)
 #define HALF_RANGE_L (65536UL*HALF_RANGE) // i.e. HALF_RANGE<<16, as uint32_t
-//#define MY_VELOCITY 100 * 512 // added per RDP keyboard velocity code REM this out to change to a variable
-
 
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -84,7 +84,6 @@ struct synth_s
 	int16_t benderCVs[pcFil6-pcOsc1A+1];
 	int16_t benderVolumeCV;
     int16_t benderPW;// BenderPW
-   // int16_t MY_VELOCITY; //added V2.24 JRS added back 2.25
 
 	int16_t glideAmount;
 	int8_t gliding;
@@ -717,7 +716,7 @@ static void refreshPresetPots(int8_t force)
 {
 	continuousParameter_t cp;
 	
-	for(cp=0;cp<(cpCount-1);++cp)// -1 for Noise. add 1 element [cpNoiselevel] in storage.h, [enum continuousParameter_t]  changed to -4
+	for(cp=0;cp<(cpCount-1);++cp)// -1 for Noise. add 1 element [cpNoiselevel] in storage.h, [enum continuousParameter_t]
 		if((continuousParameterToPot[cp]!=ppNone) && (force || continuousParameterToPot[cp]==ui.lastActivePot || potmux_hasChanged(continuousParameterToPot[cp])))
 		{
 			p600Pot_t pp=continuousParameterToPot[cp];
@@ -762,14 +761,30 @@ static FORCEINLINE void refreshVoice(int8_t v,int16_t oscEnvAmt,int16_t filEnvAm
 		va=pitchALfoVal;
 		vb=pitchBLfoVal;
 
+        //V2.28
+        switch(currentPreset.steppedParameters[spPolyModEnv])
+        {
+            case 0:
+                va+=scaleU16S16(envVal,oscEnvAmt);
+                break;
+            case 1:
+                vb+=scaleU16S16(envVal,oscEnvAmt);
+                break;
+            case 2:
+                vb+=scaleU16S16(envVal,oscEnvAmt);
+                va+=scaleU16S16(envVal,oscEnvAmt);
+                break;
+          
+        }
+        
 		// osc B
-
+        
 		vb+=synth.oscBNoteCV[v];
 		sh_setCV32Sat_FastPath(pcOsc1B+v,vb);
+        
 
 		// osc A
-
-		va+=scaleU16S16(envVal,oscEnvAmt);	
+		//va+=scaleU16S16(envVal,oscEnvAmt);	//REMmed out V2.28 for polymod env to both vcos
 		va+=synth.oscANoteCV[v];
 		sh_setCV32Sat_FastPath(pcOsc1A+v,va);
 
@@ -1304,7 +1319,6 @@ void synth_assignerEvent(uint8_t note, int8_t gate, int8_t voice, uint16_t veloc
 		adsr_setCVs(&synth.filEnvs[voice],0,0,0,0,(UINT16_MAX-velAmt)+scaleU16U16(velocity,velAmt),0x10);
 		velAmt=currentPreset.continuousParameters[cpAmpVelocity];
 		adsr_setCVs(&synth.ampEnvs[voice],0,0,0,0,(UINT16_MAX-velAmt)+scaleU16U16(velocity,velAmt),0x10);
-    
 	}
 	
 #ifdef DEBUG

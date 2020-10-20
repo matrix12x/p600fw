@@ -17,7 +17,7 @@
 #define MAX_SYSEX_SIZE TEMP_BUFFER_SIZE
 
 #define MIDI_BASE_STEPPED_CC 48
-#define MIDI_BASE_COARSE_CC 16 // V2.25 moved from 16 to 13 to accomodate LFO3 parameters
+#define MIDI_BASE_COARSE_CC 16 
 #define MIDI_BASE_FINE_CC 80
 
 static MidiDevice midi;

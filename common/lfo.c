@@ -41,8 +41,10 @@ static void handlePhaseOverflow(struct lfo_s * l)
 		;
 	}
 }
-// void LOWERCODESIZE newSeq(void) // NEW LFO shapes JHHL
-//;
+// NEW LFO shapes JHHL
+ void LOWERCODESIZE newSeq(void)
+;
+
 void LOWERCODESIZE lfo_setCVs(struct lfo_s * lfo, uint16_t spd, uint16_t lvl)
 {
 	lfo->levelCV=lvl;
@@ -55,7 +57,7 @@ void LOWERCODESIZE lfo_setCVs(struct lfo_s * lfo, uint16_t spd, uint16_t lvl)
 	}
 }
 
-// NEW LFO shapes JHHL  the idea here is to make up a little melody with some redundancy.
+// NEW LFO shapes JHHL the idea here is to make up a little melody with some redundancy.
 void LOWERCODESIZE newSeq(void)
 {
     for(int i = 0 ; i<16;i++)
@@ -100,8 +102,8 @@ void LOWERCODESIZE lfo_setShape(struct lfo_s * lfo, lfoShape_t shape)
 		srandom(currentTick);
 	
 	lfo->noise=random();
-    
-    if((shape !=lastShape) &&(shape == lsSeq)) // NEW LFO shapes JHHL
+    // NEW LFO shapes JHHL
+    if((shape !=lastShape) &&(shape == lsSeq))
     {
         newSeq();
     }

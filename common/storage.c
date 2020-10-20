@@ -6,7 +6,7 @@
 #include "uart_6850.h"
 
 // increment this each time the binary format is changed
-#define STORAGE_VERSION 11
+#define STORAGE_VERSION 12
 
 #define STORAGE_MAGIC 0x006116a5
 
@@ -46,6 +46,7 @@ const uint8_t steppedParametersBits[spCount] =
     /*VibShape*/3,
     /*VibShift*/2,
     /*VibTargets*/6,
+    /*PolyModEnvTargets*/2,
 };
 
 struct settings_s settings;
@@ -365,7 +366,7 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
 
 		// v2
   
-		for(cp=cpModDelay;cp<=cpSeqArpClock;++cp) // maybe cpUnisonDetune so we dont recall clock V2.24
+		for(cp=cpModDelay;cp<=cpSeqArpClock;++cp)
 			currentPreset.continuousParameters[cp]=storageRead16();
         
 		for(sp=spModwheelTarget;sp<=spVibTarget;++sp)
@@ -388,10 +389,9 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
         if (storage.version<8)
             return 1;
         
-        for(cp=cpModDelay;cp<=cpNoiseLevel;++cp) // for Noise ... rem'ed out so we dont recall clock
+        for(cp=cpModDelay;cp<=cpNoiseLevel;++cp) // for Noise
             currentPreset.continuousParameters[cp]=storageRead16();
-       // currentPreset.continuousParameters[cpNoiseLevel]=storageRead16();
-        
+    
         // v10
     
         // v11
@@ -399,6 +399,13 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number)
             return 1;
         
         for(sp=spVibShape;sp<=spVibTargets;++sp)
+            currentPreset.steppedParameters[sp]=storageRead8();
+        
+        // v12 added V2.28
+        if (storage.version<12)
+            return 1;
+        
+        for(sp=spVibShape;sp<=spPolyModEnv;++sp)
             currentPreset.steppedParameters[sp]=storageRead8();
         
 	}
@@ -453,6 +460,12 @@ LOWERCODESIZE void preset_saveCurrent(uint16_t number)
         for(sp=spVibShape;sp<=spVibTargets;++sp)
             storageWrite8(currentPreset.steppedParameters[sp]);
 
+        // v12 added V2.28
+        
+        for(sp=spVibShape;sp<=spPolyModEnv;++sp)
+            storageWrite8(currentPreset.steppedParameters[sp]);
+        
+        
 		// this must stay last
 		storageFinishStore(number,1);
 	}
@@ -542,7 +555,7 @@ LOWERCODESIZE void preset_loadDefault(int8_t makeSound)
 		currentPreset.steppedParameters[spAmpEnvExpo]=1;
 		currentPreset.steppedParameters[spModwheelShift]=1;
 		currentPreset.steppedParameters[spChromaticPitch]=2; // octave
-		
+		currentPreset.steppedParameters[spPolyModEnv]=0; // added V2.28 polymod env to vco
 		memset(currentPreset.voicePattern,ASSIGNER_NO_NOTE,sizeof(currentPreset.voicePattern));
 
 		// Default tuning is equal tempered

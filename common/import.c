@@ -138,9 +138,9 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	p.steppedParameters[spChromaticPitch]=1;
 
     // added 2.25 JRS
-    p.steppedParameters[spVibShape]=1; // may need to revise because no switch
+    p.steppedParameters[spVibShape]=1;
     p.steppedParameters[spVibShift]=0;
-    p.steppedParameters[spVibTargets]=0; // my need to change because no switch
+    p.steppedParameters[spVibTargets]=0;
 
 	// save it
 	

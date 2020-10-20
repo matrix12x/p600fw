@@ -58,7 +58,8 @@ typedef enum
 	spVibTarget=24,
 	spAmpEnvSlow=25,
     spVibShape=26,spVibShift=27,spVibTargets=28, // Added V2.25 for Vib  cc=74-76
-			
+    spPolyModEnv=29, // added V2.28 for polymod env to VCOA-VCO B pitch
+    
 	// /!\ this must stay last
 	spCount
 } steppedParameter_t;
