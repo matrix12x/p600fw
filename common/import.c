@@ -141,6 +141,8 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
     p.steppedParameters[spVibShape]=1;
     p.steppedParameters[spVibShift]=0;
     p.steppedParameters[spVibTargets]=0;
+    // Added 2.29 JRS
+    p.steppedParameters[spPolyModEnv]=0;
 
 	// save it
 	

@@ -29,6 +29,7 @@ History
 - V2.25 JS - added new vibrato waveforms and Vibrato targets
 - V2.26B JS - fixed post “Tune” volume bug introduced in V2.25
 - V2.28 JS - added polymod VCO A, VCO B, VCO A-B targets
+- V2.29 JS - fixed error with CC 57 and 74 (LFO Shape and Vibe Shape) where not all shapes were selectable, sped up UI to V2.26B speed, Added CC 77 (Poly Mod Filter Env to modulate VCO A, VCO B, or VCO AB)
 
 V2.25 includes -
 LFO has 6 new waveforms:

@@ -26,7 +26,7 @@ const uint8_t steppedParametersBits[spCount] =
 	/*Sync*/1,
 	/*PModFA*/1,
 	/*PModFil*/1,
-	/*LFOShape*/3,
+	/*LFOShape*/4,
 	/*LFOShift*/2,
 	/*LFOTargets*/6,
 	/*TrackingShift*/2,
@@ -41,11 +41,11 @@ const uint8_t steppedParametersBits[spCount] =
 	/*ModwheelShift*/3,
 	/*ChromaticPitch*/2,
 	/*ModwheelTarget*/1,
-	/*VibTarget*/2,
+	/*VibTarget(modwheel target)*/2,
 	/*AmpEnvSlow*/1,
-    /*VibShape*/3,
+    /*VibShape*/4,
     /*VibShift*/2,
-    /*VibTargets*/6,
+    /*VibTargets*/3,
     /*PolyModEnvTargets*/2,
 };
 

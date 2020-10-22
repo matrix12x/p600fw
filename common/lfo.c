@@ -42,8 +42,8 @@ static void handlePhaseOverflow(struct lfo_s * l)
 	}
 }
 // NEW LFO shapes JHHL
- void LOWERCODESIZE newSeq(void)
-;
+// void LOWERCODESIZE newSeq(void)  //V2.29 remed mout to see if this has an effect on the UI
+//;
 
 void LOWERCODESIZE lfo_setCVs(struct lfo_s * lfo, uint16_t spd, uint16_t lvl)
 {
