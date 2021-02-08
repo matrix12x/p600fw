@@ -999,6 +999,7 @@ void synth_update(void)
 					ui.lastActivePot==ppFilSus || ui.lastActivePot==ppFilRel)
 				refreshEnvSettings();
 		}
+        synth_refresh_MVol_Knob(); //moved here V2.32 to speed up volume knob
 	}
 	
 	switch(frc&0x03) // 4 phases
@@ -1019,7 +1020,7 @@ void synth_update(void)
 		sh_setCV(pcVolA,currentPreset.continuousParameters[cpVolA],SH_FLAG_IMMEDIATE);
 		sh_setCV(pcVolB,currentPreset.continuousParameters[cpVolB],SH_FLAG_IMMEDIATE);
             // set a flag when volume pot or pitchbendVolume is changed and if the flag is high then do this Command
-        synth_refresh_MVol_Knob();
+        //synth_refresh_MVol_Knob();
 		//sh_setCV(pcMVol,satAddU16S16(potmux_getValue(ppMVol),synth.benderVolumeCV),SH_FLAG_IMMEDIATE); // revise this to implement midi volume - maybe volume should not be set like this immediately... maybe store?
         
 		break;
@@ -1107,7 +1108,7 @@ void synth_timerInterrupt(void)
             pitchBLfoVal+=synth.vibrato.output>>1;
             break;
         case 3:
-            ampLfoVal+=synth.vibrato.output+(UINT16_MAX-(synth.vibrato.levelCV));   // added +
+            ampLfoVal+=synth.vibrato.output+(UINT16_MAX-(synth.vibrato.levelCV<<1));   // added +
             break;
         case 4:
             noiseLfoVal+=synth.vibrato.output<<2;  //added v2.25 to modulate noise level using vibe updated V2.31 to increase range
