@@ -28,7 +28,7 @@
 
 // Dead band is distance from center of pot to end of dead band area,
 // in either direction.
-#define BEND_DEADBAND 3072
+#define BEND_DEADBAND 3500 //3072 V2.30 increased deadband to clean up noise in some pitchbend wheels when centered
 // Guard band is distance from the end of pot travel until we start
 // reacting. Compensates for the fact that the bend pot cannot reach
 // especially the maximum positive voltage.
@@ -93,7 +93,7 @@ struct synth_s
 	
 	uint8_t pendingExtClock;
 	
-	int8_t transpose;// Moved to Storage.h V2.24 JRS
+	int8_t transpose;
 } synth;
 
 extern void refreshAllPresetButtons(void);
@@ -1013,7 +1013,6 @@ void synth_update(void)
 		
 		sh_setCV(pcPModOscB,currentPreset.continuousParameters[cpPModOscB],SH_FLAG_IMMEDIATE);
 		sh_setCV(pcResonance,currentPreset.continuousParameters[cpResonance],SH_FLAG_IMMEDIATE);
-		//sh_setCV(pcExtFil,24576,SH_FLAG_IMMEDIATE); // value from the emulator // rem for Noise
 		break;
 	case 2:
 		// 'fixed' CVs
@@ -1059,7 +1058,7 @@ void synth_uartInterrupt(void)
 void synth_timerInterrupt(void)
 {
 	int32_t va,vf;
-	int16_t pitchALfoVal,pitchBLfoVal,filterLfoVal,filEnvAmt,oscEnvAmt,noiseLfoVal;
+	int16_t pitchALfoVal,pitchBLfoVal,filterLfoVal,filEnvAmt,oscEnvAmt,noiseLfoVal,resonanceLfoVal;// added V2.31
 	uint16_t ampLfoVal;
 	int8_t v,hz63,hz250;
 
@@ -1075,6 +1074,7 @@ void synth_timerInterrupt(void)
     
 	filterLfoVal=0;
     noiseLfoVal=0; // added modulate noise
+    resonanceLfoVal=0; // added V2.31 modulate Resonance
 	ampLfoVal=UINT16_MAX;
 	
 	if(currentPreset.steppedParameters[spLFOTargets]&mtVCO)
@@ -1110,12 +1110,16 @@ void synth_timerInterrupt(void)
             ampLfoVal+=synth.vibrato.output+(UINT16_MAX-(synth.vibrato.levelCV));   // added +
             break;
         case 4:
-            noiseLfoVal+=synth.vibrato.output;  //added v2.25 to modulate noise level using vibe
+            noiseLfoVal+=synth.vibrato.output<<2;  //added v2.25 to modulate noise level using vibe updated V2.31 to increase range
             sh_setCV(pcExtFil,satAddU16S16(currentPreset.continuousParameters[cpNoiseLevel],noiseLfoVal),SH_FLAG_IMMEDIATE);
             break;
+        case 5:
+            resonanceLfoVal+=synth.vibrato.output<<2;//added V2.31 to modulate resonance
+            sh_setCV(pcResonance,satAddU16S16(currentPreset.continuousParameters[cpResonance],resonanceLfoVal),SH_FLAG_IMMEDIATE);
+            break;
     }
-    
 
+    
     
 	// global env computations
 	
@@ -1170,19 +1174,24 @@ void synth_timerInterrupt(void)
 		{
 			if(synth.pendingExtClock)
 				--synth.pendingExtClock;
+            
+            //added to stop seq from pummeling the timing V2.3JS
+            if(hz250)
+            {
+                if (clock_update())
+                {
+                    // sequencer
 
-			if (clock_update())
-			{
-				// sequencer
+                    if(seq_getMode(0)!=smOff || seq_getMode(1)!=smOff)
+                        seq_update();
+                
+                    // arpeggiator
 
-				if(seq_getMode(0)!=smOff || seq_getMode(1)!=smOff)
-					seq_update();
-			
-				// arpeggiator
-
-				if(arp_getMode()!=amOff)
-					arp_update();
-			}
+                    if(arp_getMode()!=amOff)
+                        arp_update();
+                }
+                
+            }
 		}
 
 		// glide
@@ -1199,7 +1208,7 @@ void synth_timerInterrupt(void)
 
 		break;
 	case 2:
-		lfo_update(&synth.vibrato);
+		lfo_update(&synth.vibrato); //V2.3JS can we rem this out?
 		refreshPulseWidth(currentPreset.steppedParameters[spLFOTargets]&mtPW);
 		break;
 	case 3:

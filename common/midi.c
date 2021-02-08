@@ -28,6 +28,8 @@ static uint8_t sendQueueData[32];
 extern void refreshFullState(void);
 extern void refreshPresetMode(void);
 
+static uint8_t OldPitchBendValue=0;
+
 static void sendEnqueue(uint8_t b)
 {
 	for(;;)
@@ -388,7 +390,7 @@ static void midi_progChangeEvent(MidiDevice * device, uint8_t channel, uint8_t p
 	}
 }
 
-// aftertouch JS August 2020
+// aftertouch JS August 2020 note: need to add note selectivity
 static void midi_aftertouchEvent(MidiDevice * device, uint8_t channel, uint8_t note, uint8_t value)
 {
     if(!midiFilterChannel(channel))
@@ -420,14 +422,18 @@ static void midi_pitchBendEvent(MidiDevice * device, uint8_t channel, uint8_t v1
 {
 	if(!midiFilterChannel(channel))
 		return;
-
+// Added V2.30JS for filtering Pitchbend messages if >old+10 && <old-10
+    if(v2!=OldPitchBendValue){
 	int16_t value;
-	
-	value=midiCombineBytes(v1,v2);
-	value-=0x2000;
-	value<<=2;
-	
-	synth_wheelEvent(value,0,1,0);
+ 
+        value=midiCombineBytes(v1,v2);
+        value-=0x2000;
+        value<<=2;
+        
+        synth_wheelEvent(value,0,1,0);
+        OldPitchBendValue=v2;
+    }
+    
 }
 
 static void midi_sysexEvent(MidiDevice * device, uint16_t count, uint8_t b0, uint8_t b1, uint8_t b2)
