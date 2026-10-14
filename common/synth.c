@@ -1403,21 +1403,55 @@ static void handleBitInputs(void)
 // P600 main code
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifdef DIAG
+// V2.5 diagnostic build (make DIAG=1): shows a step code on the left digit at each step of the start-up, with interrupts off, written straight to the
+// display latches like the updater does, shows it for 0.4 s and switches it off again. The last code seen tells where the start-up stops.
+void diag_step(uint8_t code)
+{
+    static const uint8_t seg[16]={0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71}; // 0-9 A b C d E F
+    uint8_t i;
+    BLOCK_INT
+    {
+        io_write(0x09,0x00);
+        io_write(0x08,0x20); // left digit
+        io_write(0x09,seg[code&15]|(code&0x80)); // bit 7 of the code = the dot (sub-steps)
+        io_read(0x0a); // completes the write (see display_restoreColumn)
+    }
+    for(i=0;i<40;++i)
+        MDELAY(10);
+    // switch the digit off again, so the display/scanner latches are as they would be without this diagnostic (the code stays visible for 0.4 s)
+    BLOCK_INT
+    {
+        io_write(0x09,0x00);
+        io_write(0x08,0x00);
+        io_read(0x0a);
+    }
+}
+#define DIAG_STEP(c) diag_step(c)
+#else
+#define DIAG_STEP(c)
+#endif
+
 void synth_init(void)
 {
     int8_t i;
+    int8_t settingsWereLoaded; // V2.5
 
     // init
 
     memset(&synth,0,sizeof(synth));
+    DIAG_STEP(1);
 
     scanner_init();
     display_init();
     sh_init();
     potmux_init();
+    DIAG_STEP(2);
     tuner_init();
     assigner_init();
+    DIAG_STEP(3);
     uart_init();
+    DIAG_STEP(4);
     seq_init();
     arp_init();
     ui_init();
@@ -1436,14 +1470,20 @@ void synth_init(void)
     //for NOISE stop Noise waveform
     sh_setCV(pcExtFil,0,SH_FLAG_IMMEDIATE);
 
+    DIAG_STEP(5);
     // go in scaling adjustment mode if needed
 
     if(io_read(CSI0)&16)
+    {
+        DIAG_STEP(15); // F = the scaling adjustment mode was entered (TP301 read as set)
         tuner_scalingAdjustment();
+    }
 
+    DIAG_STEP(6);
     // load settings from storage; tune when they are bad
 
-    if(!settings_load())
+    settingsWereLoaded=settings_load(); // V2.5: remembered, see the settings_save at the end
+    if(!settingsWereLoaded)
     {
         settings_loadDefault(); // first startup: panel mode, GilGi panel layout, basic init tuning, MIDI OMNI receive, bend middle position
 
@@ -1452,39 +1492,56 @@ void synth_init(void)
 #endif
     }
 
+    DIAG_STEP(7);
     // power-up light show (about 3.2 seconds, interrupts are still off here); it can be switched off in the From Tape menu (keypad 7).
     // This is after the settings are loaded because the choice is stored there.
     if(settings.bootLightShow)
         display_bootShow();
 
+    DIAG_STEP(8);
     // initialize manual preset page if needed
 
     if(!preset_loadCurrent(MANUAL_PRESET_PAGE,0))
     {
+        DIAG_STEP(0x85); // "5." the manual preset page is empty or damaged: a default is saved next (flash write)
         preset_loadDefault(1);
         preset_saveCurrent(MANUAL_PRESET_PAGE);
+        DIAG_STEP(0x86); // "6." flash write done
     }
+    else
+        DIAG_STEP(0x84); // "4." the manual preset loaded
 
+    DIAG_STEP(9);
     sh_setCV(pcMVol,HALF_RANGE,SH_FLAG_IMMEDIATE);
+    DIAG_STEP(0x81); // "1." volume CV set
 
     // dead band pre calculation
     precalcDeadband(&panelDeadband);
     bendDeadband.middle=settings.benderMiddle;
     precalcDeadband(&bendDeadband);
     precalcDeadband(&freqFineDeadband);
+    DIAG_STEP(0x82); // "2." dead bands done, the first full keyboard/button scan is next
 
     // initial input state
 
     scanner_update(1);
+    DIAG_STEP(0x83); // "3." keyboard/button scan done, reading all pots is next
     potmux_update(1); // init all
+    DIAG_STEP(10);
 
     // load last preset & do a full refresh
     refreshPresetMode();
     refreshFullState();
     computeTunedCVs(-1,-1); // force init CV's for all voices
+    DIAG_STEP(11);
     ui_setNoActivePot(1);
-    settings_save();
+    DIAG_STEP(0x87); // "7." the settings are saved next (flash write)
+    // V2.5: save the settings at start-up only when they had to be made new (V2.34 never saved at start-up). A flash write at every
+    // start-up wears the flash and, on the Teensy, goes through the bootloader each time the synth is switched on.
+    if(!settingsWereLoaded)
+        settings_save();
 
+    DIAG_STEP(12);
     // set the volume to the current pot value
     synth.masterVolume=potmux_getValue(ppMVol);
 
@@ -1875,18 +1932,22 @@ void synth_timerInterrupt(void)
     case 3:
         if(hz250)
         {
+            // V2.5 (Teensy): keys/buttons and display as in V2.34 (scan, then display, at 250Hz; the buttons at 63Hz). The Flat-Labs
+            // build scanned 2 bytes on every tick and switched the display column on again after each scan (scanner_updateSlice and
+            // display_restoreColumn); on the Teensy the display then stayed dark and the buttons did not react.
+            scanner_update(hz63);
             display_update(hz63);
+            // V2.5: complete the last display write now (a write reaches its latch only when the next bus access starts, see
+            // display_restoreColumn). The light show only became visible on the Teensy with this read after each refresh.
+            BLOCK_INT
+            {
+                io_read(CSI1);
+            }
             if (hz63)
                 ui_update();
         }
         break;
     }
-
-    // buttons+keys: 2 of the 16 scanner bytes on every tick, so every byte is scanned every 8th tick (250Hz, debounce time kept in scanner.c).
-    // Doing all 16 at once made every 8th tick much longer than the others; 2 per tick keeps the worst case tick short.
-    scanner_updateSlice(frc);
-    // the scanner has just used the CSO0 latch, which also holds the display column enable: switch the column on again (otherwise the display and LEDs stay dark)
-    display_restoreColumn();
 
     ++frc;
 

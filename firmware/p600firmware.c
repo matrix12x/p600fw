@@ -3,6 +3,7 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <util/crc16.h>
+#include <avr/wdt.h>
 #include <string.h>
 #include "usb_debug_only.h"
 #include "print.h"
@@ -515,6 +516,15 @@ void __attribute__((section(".vectors"),naked,used)) __init(void)
 		"ldi r29,hi8(__stack) \n\t"
 		"out 0x3e,r29 \n\t" // SPH
 		"out 0x3d,r28 \n\t" // SPL
+		// V2.5: keep the reset cause in GPIOR0 (for the diagnostic build), clear it and switch the watchdog off. On a Teensy where
+		// a flash write through the bootloader leaves the watchdog running, the synth was reset again and again (diagnostic: reset
+		// cause 8 = watchdog); after a watchdog reset the watchdog stays on until the reset flag is cleared and it is switched off.
+		"in r24,0x34 \n\t" // MCUSR
+		"out 0x1e,r24 \n\t" // GPIOR0
+		"out 0x34,r1 \n\t" // MCUSR = 0 (clears WDRF, which would keep the watchdog on)
+		"ldi r24,0x18 \n\t" // WDCE | WDE: timed sequence to change the watchdog
+		"sts 0x60,r24 \n\t" // WDTCSR
+		"sts 0x60,r1 \n\t" // WDTCSR = 0: watchdog off
 		// call updater
 		"call 0x1e000 \n\t"
 		// back to regular init
@@ -537,11 +547,21 @@ void storage_write(uint32_t pageIdx, uint8_t *buf)
 	{
 		blHack_program_page(pageIdx*STORAGE_PAGE_SIZE+STORAGE_ADDR,buf);
 
+		// V2.5: the flash write goes through code in the Teensy bootloader. On at least one Teensy++ 2.0 the watchdog was running
+		// afterwards and reset the synth (diagnostic build: stop right after the write, then reset cause 8 = watchdog). Switch it off.
+		MCUSR&=~(1<<WDRF);
+		wdt_disable();
+
 		// Somewhere R16 appears to get clobbered even though the
 		// compiler is not aware of it, possibly in the SPM routine
 		// called by blHack_call_SPM. So to avoid potential problems
 		// in callers higher up in the stack we mark R16 as clobbered here.
-		CLOBBERED("r16");
+		// V2.5: mark ALL registers that a function must keep (r2-r17, r28, r29) as clobbered, so that storage_write saves and
+		// restores every one of them. The routine in the Teensy bootloader is not ours, and blHack_program_page in the NRWW area
+		// is whatever build was last installed with the Teensy Loader (a sysex update never replaces it), so which registers get
+		// changed depends on the Teensy, not on this build. V2.5 keeps values in more registers across calls than V2.34 did.
+		// r1 must be zero for compiled code; it is cleared again too.
+		__asm__ __volatile__ ("clr r1" : : : "r2","r3","r4","r5","r6","r7","r8","r9","r10","r11","r12","r13","r14","r15","r16","r17","r28","r29","memory");
 	}
 }
 
@@ -589,7 +609,30 @@ int main(void)
 
 	// initialize synth code
 
+#ifdef DIAGTIME
+	// V2.5 timing test (make DIAG=1 DIAGTIME=1): nothing but a counter on the left digit, 0..F, one step every 0.5 s, interrupts off,
+	// no synth code at all. If it stops counting after some seconds, something outside the program (a reset) stops it.
+	{
+		static const uint8_t seg[16]={0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
+		uint8_t n=0,dot=0;
+		for(;;)
+		{
+			hardware_write(1,0x09,0x00); CYCLE_WAIT(8);
+			hardware_write(1,0x08,0x20); CYCLE_WAIT(8);
+			hardware_write(1,0x09,seg[n&15]|dot); CYCLE_WAIT(8);
+			hardware_read(1,0x0a); CYCLE_WAIT(8);
+			_delay_ms(500);
+			if(++n==16) { n=0; dot^=0x80; } // the dot changes every 8 s, so a full round of 16 s is visible
+		}
+	}
+#endif
+#ifdef DIAG
+	{ extern void diag_step(uint8_t code); uint8_t r=GPIOR0; diag_step(0x80|(r&0x0f)); diag_step(0); } // (GPIOR0: the reset cause saved by __init) // V2.5 diagnostic build: first the reset cause with a dot (1. power on, 2. reset pin, 4. brown-out, 8. watchdog; a sum if several), then 0 = main() reached
+#endif
 	synth_init();
+#ifdef DIAG
+	{ extern void diag_step(uint8_t code); diag_step(13); } // d = synth_init() done, interrupts go on next
+#endif
 	
 	// all inited, enable ints and do periodical updates
 	

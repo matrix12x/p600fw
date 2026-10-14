@@ -7,7 +7,7 @@
 #define SCANNER_BYTES 16
 #define SCANNER_KEYS_START 64
 #define SCANNER_DEBOUNCE_TIMEOUT 5
-#define SCANNER_BUTTON_DEBOUNCE_TIMEOUT 20 // buttons are scanned 4x as often now: keep the original ~80 ms debounce
+#define SCANNER_BUTTON_DEBOUNCE_TIMEOUT 5 // V2.5 (Teensy): the buttons are scanned at 63Hz again as in V2.34 (the Flat-Labs build scanned them 4x as often and used 20), so V2.34's 5 = ~80 ms
 
 static struct
 {
@@ -39,8 +39,14 @@ FORCEINLINE int8_t scanner_buttonState(p600Button_t button)
 	return scanner_state(button);
 }
 
+#ifdef DIAG
+extern void diag_step(uint8_t code);
+#endif
 static FORCEINLINE void scanner_event(uint8_t key, int8_t pressed)
 {
+#ifdef DIAG
+	{ static uint8_t shown=0; if(shown<4){ ++shown; diag_step(0x8e); } } // "E." (at most 4 times): a key or button event, e.g. a key that reads as pressed at power-on
+#endif
 	if (key<SCANNER_KEYS_START)
 		synth_buttonEvent(key,pressed);
 	else

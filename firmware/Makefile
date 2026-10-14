@@ -147,6 +147,13 @@ CSTANDARD = -std=gnu99
 
 # Place -D or -U options here for C sources
 CDEFS = -DF_CPU=$(F_CPU)UL
+# V2.5: 'make DIAG=1' builds the diagnostic version (start-up step codes on the display, see diag_step in common/synth.c)
+ifdef DIAG
+CDEFS += -DDIAG
+endif
+ifdef DIAGTIME
+CDEFS += -DDIAGTIME
+endif
 
 
 # Place -D or -U options here for ASM sources
@@ -540,9 +547,10 @@ extcoff: $(TARGET).elf
 	@echo $(MSG_FLASH) $@
 	$(OBJCOPY) -O binary -R .eeprom -R .fuse -R .lock -R .signature -R .updater -R .nrww_misc -R .bootloader $< $@
 
-# V2.5: page 6 last and no end message, so the sysex update also works with the updater of V2.34 and older (see fw2syx.py and the README)
+# V2.5: the usual order with the end message (the updater then shows 'S'). The updaters in the released V2.34 and older hex files have the
+# CRC built in, so they do not need the special order (fw2syx.py --last-page 6 --no-end, only for an updater that calls into the program)
 %.syx: %.bin
-	python3 ../fw2syx/fw2syx.py --last-page 6 --no-end $< -o $@
+	python3 ../fw2syx/fw2syx.py $< -o $@
 
 # V2.5: the presets start at 0x1e000-STORAGE_SIZE = 0x16000 (common/hardware.h, firmware/p600firmware.c STORAGE_ADDR). The program and
 # its initialised data (they end at __data_load_end) must stay below, otherwise flashing it would overwrite presets (or the presets the code).
