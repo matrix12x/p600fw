@@ -781,11 +781,12 @@ LOWERCODESIZE int8_t preset_loadCurrent(uint16_t number, uint8_t loadFromBuffer)
 	return 1;
 }
 
-LOWERCODESIZE void preset_saveCurrent(uint16_t number)
+// V2.51: preset_saveCurrent is split in two: presetWriteToBuffer builds the preset page in storage.buffer (everything the save did except the final
+// storageFinishStore), so the edit buffer can be sent as a sysex dump without touching the flash (see storage_exportCurrent). The caller blocks interrupts.
+static LOWERCODESIZE void presetWriteToBuffer(void)
 {
 	uint8_t i;
 	
-	BLOCK_INT
 	{
 		storagePrepareStore();
 
@@ -861,11 +862,45 @@ LOWERCODESIZE void preset_saveCurrent(uint16_t number)
 
 		storageWrite8(currentPreset.steppedParameters[spVibShape]);
 		storageWrite8(currentPreset.steppedParameters[spVibRange]);
+	}
+}
 
+// V2.51: the wrapper, it stores what presetWriteToBuffer built (same result as before the split)
+LOWERCODESIZE void preset_saveCurrent(uint16_t number)
+{
+	BLOCK_INT
+	{
+		presetWriteToBuffer();
 
 		// this must stay last
 		storageFinishStore(number,1); // yes, one page is enough
 	}
+}
+
+// V2.51: the current sound (edit buffer) as a patch dump page, for sysex command 3. Same page as preset_saveCurrent would store, trailing
+// zeros trimmed like storage_export, and buf[0] is STORAGE_EDIT_BUFFER_NUMBER instead of a preset number. Nothing is written to the flash.
+LOWERCODESIZE void storage_exportCurrent(uint8_t * buf, int16_t * size)
+{
+	int16_t actualSize;
+
+	BLOCK_INT
+	{
+		presetWriteToBuffer();
+
+		actualSize=STORAGE_PAGE_SIZE;
+		while(actualSize>0 && storage.buffer[actualSize-1]==0)
+			--actualSize;
+
+		buf[0]=STORAGE_EDIT_BUFFER_NUMBER;
+		memcpy(&buf[1],storage.buffer,actualSize);
+		*size=actualSize+1;
+	}
+}
+
+// V2.51: the preset storage format version, for the sysex identity reply (command 6)
+uint8_t storage_getVersion(void)
+{
+	return STORAGE_VERSION;
 }
 
 LOWERCODESIZE int8_t storage_loadSequencer(int8_t track, uint8_t * data, uint8_t size)
@@ -920,11 +955,34 @@ LOWERCODESIZE void storage_export(uint16_t number, uint8_t * buf, int16_t * load
 
 LOWERCODESIZE void storage_import(uint16_t number, uint8_t * buf, int16_t size)
 {
-	// V2.5: a patch dump is one page at most (a longer message would have overrun storage.buffer)
+	// V2.51: a patch dump is one page at most. V2.5 cut a longer one to a page; it is now ignored (a dump that long is not a preset page)
 	if (size>(int16_t)STORAGE_PAGE_SIZE)
-		size=STORAGE_PAGE_SIZE;
+		return;
 	if (size<0)
 		size=0;
+
+	// V2.51: number 0x7F is an edit buffer dump (see storage_exportCurrent): it is never stored. In preset mode it becomes the current sound,
+	// in manual mode it is ignored. The magic is checked FIRST: preset_loadCurrent starts from the default preset, so a bad page would wipe the sound.
+	if (number==STORAGE_EDIT_BUFFER_NUMBER)
+	{
+		if (!settings.presetMode)
+			return;
+		BLOCK_INT
+		{
+			memset(storage.buffer,0,sizeof(storage.buffer));
+			memcpy(storage.buffer,buf,size);
+			storage.bufPtr=storage.buffer;
+			if(storageRead32()!=STORAGE_MAGIC)
+			{
+				memset(storage.buffer,0,sizeof(storage.buffer));
+				return;
+			}
+			preset_loadCurrent(0,1);
+			ui.presetModified=1;
+			resetPickUps();
+		}
+		return;
+	}
 
 	BLOCK_INT
 	{
@@ -969,6 +1027,34 @@ LOWERCODESIZE void storage_import(uint16_t number, uint8_t * buf, int16_t size)
     ui.presetAwaitingNumber=-1;
     if (ui.isInPatchManagement) ui.digitInput=diStoreDecadeDigit;
     sevenSeg_setNumber(number);
+}
+
+// V2.51: store a patch dump page into preset slot <number>, whatever the mode (sysex command 5 followed by a patch dump, see midi.c).
+// Rejects a slot above 99, a page shorter than the magic + version (5 bytes) or longer than a page, and a page without the magic.
+// Like the patch management import, the page is loaded and saved again so it is stored in this firmware's format.
+// buf may point into tempBuffer: it is copied to storage.buffer before tempBuffer is used to keep the current preset.
+LOWERCODESIZE void storage_importToSlot(uint16_t number, uint8_t * buf, int16_t size)
+{
+	if (number>99 || size<5 || size>(int16_t)STORAGE_PAGE_SIZE)
+		return;
+
+	BLOCK_INT
+	{
+		memset(storage.buffer,0,sizeof(storage.buffer));
+		memcpy(storage.buffer,buf,size);
+		storage.bufPtr=storage.buffer;
+		if(storageRead32()!=STORAGE_MAGIC)
+		{
+			memset(storage.buffer,0,sizeof(storage.buffer));
+			return;
+		}
+		memcpy(tempBuffer,&currentPreset,sizeof(currentPreset));
+		preset_loadCurrent(number,1);
+		preset_saveCurrent(number);
+		memcpy(&currentPreset,tempBuffer,sizeof(currentPreset));
+		// the slot is the selected preset: the synth plays the new sound
+		if (settings.presetMode && settings.presetNumber == number) refreshPresetMode();
+	}
 }
 
 LOWERCODESIZE void preset_loadDefault(int8_t makeSound)

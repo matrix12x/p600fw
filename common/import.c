@@ -62,6 +62,7 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	struct z80Patch_t * zp = (struct z80Patch_t *)patchData;
 	struct preset_s p,savedP;
 	uint16_t tmp;
+	uint16_t x; // V2.52: the LFO amount of the patch, scaled to 16 bits
 	
 	// basic checks
 	
@@ -94,6 +95,8 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	memset(p.voicePattern,ASSIGNER_NO_NOTE,sizeof(p.voicePattern));
 	for (i=0; i<TUNER_NOTE_COUNT; i++)
 		p.perNoteTuning[i] = i * TUNING_UNITS_PER_SEMITONE;
+	// V2.51: checked against preset_loadDefault: its other defaults (APW, BPW, cutoff, poly-mod filter env, B fine, filter env amount, LFO frequency,
+	// amp sustain, amp velocity, bender, vibrato shape, chromatic pitch) are all set by the import below, so p is fully defined before it is stored
 
 	// import patch
 
@@ -119,7 +122,13 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	p.continuousParameters[cpPModFilEnv]=HALF_RANGE+(zp->pmodFilEnv<<11);
 	p.continuousParameters[cpPModOscB]=zp->pmodOscB<<9;
 	p.continuousParameters[cpLFOFreq]=(uint16_t)(0.615385f*(float)(zp->lfoFreq<<10))+8570; // from version 8 on rescaled according to legacy setting "slow"
-	p.continuousParameters[cpLFOAmt]=(currentPreset.continuousParameters[cpLFOAmt]<=512)?0:512+(uint16_t)(15000.0f*log((((float)((zp->lfoAmt<<4)-512))/870.0f)+1));
+	// V2.51: the condition used currentPreset.continuousParameters[cpLFOAmt] (the sound playing on the synth) instead of the imported patch, so the
+	// result was 0 or garbage depending on that sound. It now uses the imported amount (zp->lfoAmt<<4); the curve itself is unchanged.
+	// V2.52: the 5 bit amount is now scaled with <<11 like the other pots (V2.51 used <<4, which is at most 496 and never passed the 512 threshold,
+	// so every SCI patch got amount 0). This matches the librarian's own import. The curve is the same, run on x: 0 stays 0, 1 gives 15770,
+	// 31 (x=63488) gives 64948, so it stays below 65535.
+	x=(uint16_t)zp->lfoAmt<<11;
+	p.continuousParameters[cpLFOAmt]=(x<=512)?0:512+(uint16_t)(15000.0f*log((((float)(x-512))/870.0f)+1));
 	p.continuousParameters[cpGlide]=(zp->glide)?(0xc000+(zp->glide<<10)):0; // this is not quite faithful compared to the Z80 (in this version glide time is longer)
 	p.continuousParameters[cpAmpVelocity]=0;
 	p.continuousParameters[cpFilVelocity]=0;
@@ -135,7 +144,9 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	p.steppedParameters[spPModFil]=zp->pmodFil;
 	p.steppedParameters[spLFOShape]=zp->lfoShape;
 	p.steppedParameters[spEnvRouting]=0;
-	p.steppedParameters[spLFOTargets]=zp->lfoPitch | (zp->lfoPW<<1) | (zp->lfoFil<<2);
+	// V2.51: the targets are bit flags of modulationTarget_t (mtVCO=1, mtVCF=2, mtVCA=4, mtPW=8). The old code did lfoPitch|(lfoPW<<1)|(lfoFil<<2),
+	// which put the PW switch on the filter (2) and the filter switch on the VCA (4). Each switch is now mapped to its target by name.
+	p.steppedParameters[spLFOTargets]=(zp->lfoPitch?mtVCO:0) | (zp->lfoPW?mtPW:0) | (zp->lfoFil?mtVCF:0);
 	p.steppedParameters[spTrackingShift]=(zp->trackHalf?1:0) + (zp->trackFull?2:0);
 	p.steppedParameters[spFilEnvShape]=0;
 	p.steppedParameters[spFilEnvSlow]=1;
