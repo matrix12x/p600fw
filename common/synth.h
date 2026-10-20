@@ -8,7 +8,7 @@
 //#define DEBUG
 
 // Flat
-#define RELEASE "Ver 2.5" // V2.5: the Flat-Labs/Imogen feature set ported to the Teensy++ 2.0 (V2.34 base)
+#define RELEASE "V2.51" // V2.51: sysex edit buffer / set parameter / store to slot / identity commands, SCI import fixes. V2.5: the Flat-Labs/Imogen feature set ported to the Teensy++ 2.0 (V2.34 base)
 
 // Chip select addresses labelled as in the schematics (Flat)
 #define CSO0	0x08	// Display, switches & keyboard
@@ -44,6 +44,11 @@
 #define SYSEX_COMMAND_PATCH_DUMP 1
 #define SYSEX_COMMAND_PATCH_DUMP_REQUEST 2
 #define SYSEX_COMMAND_UPDATE_FW 0x6b
+// V2.51: new commands (see midi.c, sysexReceiveByte)
+#define SYSEX_COMMAND_EDIT_BUFFER_REQUEST 3 // reply: the current sound as a patch dump (command 1) with number 0x7F
+#define SYSEX_COMMAND_SET_PARAMETER 4 // <type> <index> <value>: set one parameter of the current sound (preset mode), no reply
+#define SYSEX_COMMAND_STORE_TO_SLOT 5 // <nn>: the next message, if it is a patch dump, is stored into slot nn
+#define SYSEX_COMMAND_IDENTITY 6 // reply: command 6 with format, capabilities, storage version, mode, counts, version string
 
 #define SYSEX_SUBID1_BULK_TUNING_DUMP 0x08
 #define SYSEX_SUBID2_BULK_TUNING_DUMP_REQUEST 0x00

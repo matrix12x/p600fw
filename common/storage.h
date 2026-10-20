@@ -166,6 +166,12 @@ void storage_simpleExport(uint16_t number, uint8_t * buf, int16_t size);
 void storage_export(uint16_t number, uint8_t * buf, int16_t * loadedSize);
 void storage_import(uint16_t number, uint8_t * buf, int16_t size);
 
+// V2.51: sysex edit buffer and store-to-slot support (see midi.c, commands 3..6)
+#define STORAGE_EDIT_BUFFER_NUMBER 0x7F // the "preset number" of an edit buffer dump: never stored, it loads into the current sound
+void storage_exportCurrent(uint8_t * buf, int16_t * size);
+void storage_importToSlot(uint16_t number, uint8_t * buf, int16_t size);
+uint8_t storage_getVersion(void);
+
 int8_t storage_loadSequencer(int8_t track, uint8_t * data, uint8_t size);
 void storage_saveSequencer(int8_t track, uint8_t * data, uint8_t size);
 

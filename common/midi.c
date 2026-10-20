@@ -26,6 +26,9 @@
 
 static MidiDevice midi;
 static int16_t sysexSize;
+// V2.51: slot armed by sysex command 5 (STORE_TO_SLOT), -1 = none. It is taken and disarmed at the F7 of every sysex message, so it only
+// applies to the message that follows the command 5 (if that is a patch dump, it is stored into the slot)
+static int8_t sysexStoreSlot=-1;
 static byteQueue_t sendQueue;
 static uint8_t sendQueueData[32];
 
@@ -153,9 +156,118 @@ static void mtsReceiveBulkTuningDump(uint8_t * buf, int16_t size) // imogen: thi
 
 }
 
+// V2.51: set a stepped parameter of the current sound, used by the stepped CCs and by sysex command 4 (SET_PARAMETER). This is the code
+// that was in midi_ccEvent, moved here unchanged, including the unison pattern latch. Returns 1 if the value changed.
+static int8_t setSteppedParameter(int16_t param, uint8_t v)
+{
+	uint8_t prev;
+	int8_t change=0;
+
+	prev=currentPreset.steppedParameters[param];
+
+	if(currentPreset.steppedParameters[param]!=v)
+	{
+		currentPreset.steppedParameters[param]=v;
+		change=1;
+	}
+
+	// special case for unison (pattern latch)
+
+	if(param==spUnison) // the switch to unison
+	{
+		if(v && !prev)
+		{
+			// only execute changes into unison mode, not additional latches
+			assigner_latchPattern(0);
+		}
+		else
+		{
+			assigner_setPoly();
+		}
+		assigner_getPattern(currentPreset.voicePattern,NULL);
+	}
+
+	return change;
+}
+
+// V2.51: sysex command 4 (SET_PARAMETER) <type> <index> <value>, raw 7 bit data bytes (not scrambled), no reply.
+// type 0: continuous parameter, index < cpCount, value in 3 bytes: bits 15..14 (must be <=3), 13..7, 6..0.
+//         cpSeqArpClock sets the global arp/seq clock (settings.seqArpClock), like its CCs, which also works in manual mode.
+// type 1: stepped parameter, index < spCount except holdPedal (16, the amp envelope fast/slow flag slot, only written from spAmpEnvSlow), one value byte < steppedParameterRange[index].
+// Anything else (bad type, index or value, short message) is ignored. Like the CCs, preset mode only (in manual mode the pots and buttons own the sound).
+static void sysexSetParameter(void)
+{
+	uint8_t type,index;
+	uint16_t value;
+
+	if(sysexSize<7) // ID (3) + command + type + index + at least one value byte
+		return;
+
+	type=tempBuffer[4];
+	index=tempBuffer[5];
+
+	if(type==0)
+	{
+		if(sysexSize<9 || index>=cpCount || tempBuffer[6]>3)
+			return;
+		value=((uint16_t)tempBuffer[6]<<14)|((uint16_t)tempBuffer[7]<<7)|tempBuffer[8];
+
+		if(index==cpSeqArpClock) // global setting, not part of the preset (see the arp/seq clock CCs)
+		{
+			settings.seqArpClock=value&0xfffc;
+			return;
+		}
+
+		if(!settings.presetMode)
+			return;
+
+		if(currentPreset.continuousParameters[index]!=value)
+		{
+			currentPreset.continuousParameters[index]=value;
+			ui_setPresetModified(1);
+		}
+	}
+	else if(type==1)
+	{
+		if(index>=spCount || index==holdPedal || tempBuffer[6]>=steppedParameterRange[index])
+			return;
+
+		if(!settings.presetMode)
+			return;
+
+		if(setSteppedParameter(index,tempBuffer[6]))
+			ui_setPresetModified(1);
+	}
+	// (the end of the sysex handling calls refreshFullState)
+}
+
+// V2.51: sysex command 6 (IDENTITY): reply with command 6, scrambled data:
+// format (1), capabilities (0x0F: bits 0..3 = commands 3..6), storage version, preset mode (1) or manual (0), cpCount, spCount,
+// then the VERSION string (7 bit) and a zero byte
+static void sysexSendIdentity(void)
+{
+	static const char version[]=VERSION;
+	int16_t i,size;
+
+	memset(tempBuffer,0,MAX_SYSEX_SIZE);
+	tempBuffer[0]=1;
+	tempBuffer[1]=0x0F;
+	tempBuffer[2]=storage_getVersion();
+	tempBuffer[3]=settings.presetMode?1:0;
+	tempBuffer[4]=cpCount;
+	tempBuffer[5]=spCount;
+	size=6;
+	for(i=0;version[i];++i)
+		tempBuffer[size++]=version[i]&0x7f;
+	tempBuffer[size++]=0;
+
+	sysexSend(SYSEX_COMMAND_IDENTITY,size);
+}
+
 static void sysexReceiveByte(uint8_t b)
 {
 	int16_t size;
+	int8_t storeSlot;
 
 	switch(b)
 	{
@@ -164,6 +276,10 @@ static void sysexReceiveByte(uint8_t b)
 		memset(tempBuffer,0,MAX_SYSEX_SIZE);
 		break;
 	case 0xF7: // End SysEx message
+		// V2.51: take the slot armed by the previous message (command 5) and disarm it: it only applies to this message
+		storeSlot=sysexStoreSlot;
+		sysexStoreSlot=-1;
+
 		if(tempBuffer[0]==0x01 && tempBuffer[1]==0x02) // SCI P600 program dump
 		{
 			if (ui.isInPatchManagement)
@@ -179,10 +295,27 @@ static void sysexReceiveByte(uint8_t b)
 			{
 			case SYSEX_COMMAND_PATCH_DUMP:
 				size=sysexDescrambleBuffer(4);
-				storage_import(tempBuffer[4],&tempBuffer[5],size-1);
+				if(storeSlot>=0) // V2.51: a command 5 came just before: store into that slot, in any mode (the number in the dump is not used)
+					storage_importToSlot(storeSlot,&tempBuffer[5],size-1);
+				else
+					storage_import(tempBuffer[4],&tempBuffer[5],size-1);
 				break;
 			case SYSEX_COMMAND_PATCH_DUMP_REQUEST:
 				midi_dumpPreset(tempBuffer[4]);
+				break;
+			case SYSEX_COMMAND_EDIT_BUFFER_REQUEST: // V2.51: the current sound as a patch dump with number 0x7F, nothing is stored
+				storage_exportCurrent(tempBuffer,&size);
+				sysexSend(SYSEX_COMMAND_PATCH_DUMP,size);
+				break;
+			case SYSEX_COMMAND_SET_PARAMETER: // V2.51
+				sysexSetParameter();
+				break;
+			case SYSEX_COMMAND_STORE_TO_SLOT: // V2.51: arm the slot for the next message (<nn> 0..99, anything else is ignored)
+				if(sysexSize>=5 && tempBuffer[4]<=99)
+					sysexStoreSlot=tempBuffer[4];
+				break;
+			case SYSEX_COMMAND_IDENTITY: // V2.51
+				sysexSendIdentity();
 				break;
 			}
 		}
@@ -374,32 +507,13 @@ static void midi_ccEvent(MidiDevice * device, uint8_t channel, uint8_t control, 
 			param=spVibRange;
 		else
 			param=control-MIDI_BASE_STEPPED_CC;
-		uint8_t v, prev;
+		uint8_t v;
 		
-        prev=currentPreset.steppedParameters[param];
         v=(((uint16_t)value)*steppedParameterRange[param])>>7;
 		
-		if(currentPreset.steppedParameters[param]!=v)
-		{
-			currentPreset.steppedParameters[param]=v;
-			change=1;	
-		}
-		
-		// special case for unison (pattern latch)
-		
-		if(param==spUnison) // the switch to unison
-		{
-			if(v && !prev)
-			{
-                // only execute changes into unison mode, not additional latches
-				assigner_latchPattern(0);
-			}
-			else
-			{
-				assigner_setPoly();
-			}
-			assigner_getPattern(currentPreset.voicePattern,NULL);
-		}
+		// V2.51: the value change and the unison latch moved to setSteppedParameter (shared with sysex command 4)
+		if(setSteppedParameter(param,v))
+			change=1;
 	}
 
 
