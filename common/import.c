@@ -62,6 +62,7 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	struct z80Patch_t * zp = (struct z80Patch_t *)patchData;
 	struct preset_s p,savedP;
 	uint16_t tmp;
+	uint16_t x; // V2.52: the LFO amount of the patch, scaled to 16 bits
 	
 	// basic checks
 	
@@ -123,9 +124,11 @@ LOWERCODESIZE void import_sysex(uint8_t * buf, int16_t size)
 	p.continuousParameters[cpLFOFreq]=(uint16_t)(0.615385f*(float)(zp->lfoFreq<<10))+8570; // from version 8 on rescaled according to legacy setting "slow"
 	// V2.51: the condition used currentPreset.continuousParameters[cpLFOAmt] (the sound playing on the synth) instead of the imported patch, so the
 	// result was 0 or garbage depending on that sound. It now uses the imported amount (zp->lfoAmt<<4); the curve itself is unchanged.
-	// NOTE: lfoAmt is a 5 bit value, so lfoAmt<<4 is at most 31*16=496 and never exceeds the 512 threshold: every SCI patch imports with LFO amount 0
-	// for now. The scale of this conversion is still to be decided.
-	p.continuousParameters[cpLFOAmt]=(((uint16_t)zp->lfoAmt<<4)<=512)?0:512+(uint16_t)(15000.0f*log((((float)((zp->lfoAmt<<4)-512))/870.0f)+1));
+	// V2.52: the 5 bit amount is now scaled with <<11 like the other pots (V2.51 used <<4, which is at most 496 and never passed the 512 threshold,
+	// so every SCI patch got amount 0). This matches the librarian's own import. The curve is the same, run on x: 0 stays 0, 1 gives 15770,
+	// 31 (x=63488) gives 64948, so it stays below 65535.
+	x=(uint16_t)zp->lfoAmt<<11;
+	p.continuousParameters[cpLFOAmt]=(x<=512)?0:512+(uint16_t)(15000.0f*log((((float)(x-512))/870.0f)+1));
 	p.continuousParameters[cpGlide]=(zp->glide)?(0xc000+(zp->glide<<10)):0; // this is not quite faithful compared to the Z80 (in this version glide time is longer)
 	p.continuousParameters[cpAmpVelocity]=0;
 	p.continuousParameters[cpFilVelocity]=0;

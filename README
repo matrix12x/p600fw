@@ -36,6 +36,7 @@ History
 - V2.34 JS - JAM revised Arp to remove double notes and added new random mode (Thanks!!) The new random mode prevent notes to play several times in a row; each note is always different than the previous one (except if only one note is played, obviously).
 - V2.5 JS - "Matrix edition". Moved to Imogen's firmware (through the Flat-Labs Z80P600 fork) and carried all V2.34 features over to it. New: arp Euclidean rhythms, step probability, swing, triplets and 32nds, ratchets; ensemble vibrato; vibrato can use all 12 LFO shapes; 8 vibrato targets; poly-mod env to PW A, PW B or both; faster panel scanning; V2.34 patches load and are converted
 - V2.51 JS - new sysex commands for editors and librarians (edit buffer request and dump, set one parameter, store to a slot, identity), SCI patch import fixes (LFO targets and amount)
+- V2.52 JS - SCI patch import: the LFO amount of the patch is now carried over (it was always 0)
 
 
 V2.25 includes -
@@ -173,8 +174,18 @@ Fixed in V2.51:
 Importing original SCI Prophet 600 patches (sysex "01 02 nn" in patch management):
 - The LFO targets were wrong: the PW switch went to the filter and the filter switch to the VCA. Pitch, PW and filter now land where they belong.
 - The LFO amount depended on the sound that was playing on the synth instead of the imported patch. It now comes from the patch.
-  Note: with the current scale every SCI patch still gets LFO amount 0 (the 5 bit amount of the original never reaches the threshold); the scale will be revised.
+  (In V2.51 every SCI patch still got LFO amount 0, see V2.52.)
 - Everything an original patch does not have (arp, vibrato, ensemble, tuning, name ...) gets its default value.
+
+
+V2.52 includes -
+Files: p600firmware V2.52.syx and p600firmware V2.52.hex. From V2.5 or V2.51 a sysex update keeps your presets (same storage version 16).
+The welcome text is now "P600 Matrix edition V2.52"; the sysex identity reply (command 06) says "V2.52".
+
+Fixed in V2.52:
+Importing original SCI Prophet 600 patches: the LFO amount is now carried over. The 5 bit amount (0-31) is scaled like the other knobs
+(times 2048) and then goes through the same curve as before, so it matches the librarian's own import. 0 stays 0, 1 gives about a quarter,
+15 about 83% and 31 (full) about 99% of the LFO amount knob. In V2.51 the scale was too small and every patch got 0.
 
 
 Thanks -

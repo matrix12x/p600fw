@@ -8,7 +8,7 @@
 //#define DEBUG
 
 // Flat
-#define RELEASE "V2.51" // V2.51: sysex edit buffer / set parameter / store to slot / identity commands, SCI import fixes. V2.5: the Flat-Labs/Imogen feature set ported to the Teensy++ 2.0 (V2.34 base)
+#define RELEASE "V2.52" // V2.52: SCI import LFO amount scaled with <<11. V2.51: sysex edit buffer / set parameter / store to slot / identity commands, SCI import fixes. V2.5: the Flat-Labs/Imogen feature set ported to the Teensy++ 2.0 (V2.34 base)
 
 // Chip select addresses labelled as in the schematics (Flat)
 #define CSO0	0x08	// Display, switches & keyboard
