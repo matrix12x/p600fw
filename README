@@ -35,6 +35,7 @@ History
 - V2.33 JS - Polymod env target PWM VCOA and VCOB, fixed bug introduced in V2.32 causing volume to drop over time
 - V2.34 JS - JAM revised Arp to remove double notes and added new random mode (Thanks!!) The new random mode prevent notes to play several times in a row; each note is always different than the previous one (except if only one note is played, obviously).
 - V2.5 JS - "Matrix edition". Moved to Imogen's firmware (through the Flat-Labs Z80P600 fork) and carried all V2.34 features over to it. New: arp Euclidean rhythms, step probability, swing, triplets and 32nds, ratchets; ensemble vibrato; vibrato can use all 12 LFO shapes; 8 vibrato targets; poly-mod env to PW A, PW B or both; faster panel scanning; V2.34 patches load and are converted
+- V2.51 JS - new sysex commands for editors and librarians (edit buffer request and dump, set one parameter, store to a slot, identity), SCI patch import fixes (LFO targets and amount)
 
 
 V2.25 includes -
@@ -139,6 +140,41 @@ The sysex updater no longer calls into the program it is replacing.
 Saving to flash goes through the Teensy bootloader; the registers the program needs are now kept across it (a save crashed the synth) and the watchdog is switched off.
 The settings are only saved at power on when they had to be made new (as in V2.34).
 Keys, buttons and display are scanned as in V2.34 (the Flat-Labs way left the display and LEDs dark on the Teensy).
+
+
+V2.51 includes -
+Files: p600firmware V2.51.syx and p600firmware V2.51.hex. Install them as described in "Updating from V2.34" above.
+From V2.5 a sysex update keeps everything: the presets are stored the same way (storage version 16). It is still wise to dump your presets first.
+The welcome text is now "P600 Matrix edition V2.51".
+
+New sysex commands, for editors and librarians. They all use the P600FW ID: F0 00 61 16 <command> ... F7.
+Patch data is sent like the patch dumps: each group of 4 data bytes is sent as their low 7 bits, then one byte with their top bits (bit 0 = 1st byte ... bit 3 = 4th byte).
+The other data bytes (parameter, slot) are sent as they are.
+- 01 patch dump (as before): <number> <patch page>. In patch management it is stored into preset <number> (only 0-99; a dump longer than one 256 byte page is ignored).
+  Outside patch management, in preset mode, it is played (loaded into the current sound) but not stored.
+  Number 7F (127) is an "edit buffer" dump: it is never stored. In preset mode it becomes the current sound (only if it is a valid patch,
+  otherwise the sound is kept); in manual mode it is ignored.
+- 02 patch dump request (as before): <number>. Answer: a 01 patch dump of preset <number>, if it is not empty.
+- 03 edit buffer request (new): no data. Answer: the current sound as a 01 patch dump with number 7F. Nothing is stored.
+- 04 set parameter (new): <type> <index> <value>. No answer. Only in preset mode (like the CCs); a message that is not valid is ignored.
+  type 0 = continuous parameter (knobs): index 0-34, value in 3 bytes: bits 15-14 (0-3), bits 13-7, bits 6-0 (a 16 bit value).
+           Index 29 (arp/seq clock) sets the clock, which is a global setting and not part of the patch (this one also works in manual mode).
+  type 1 = stepped parameter (switches, menus): index 0-39 (not 10 and not 16), one value byte, 0 up to the number of choices - 1.
+  The parameter numbers are the same as for the CCs (continuous: CC 16 + index, stepped: CC 48 + index). The sound counts as modified.
+- 05 store to slot (new): <slot 0-99>. The next message, if it is a 01 patch dump, is stored into this slot, whatever its own number,
+  in any mode (no need for patch management). Only the next message: any other message in between cancels it. A dump that is not a valid
+  patch or is too long is not stored. If the slot is the preset being played, the synth plays the new sound right away.
+- 06 identity request (new): no data. Answer: command 06 with (sent like patch data): 1 (format), 0F (commands 3-6 are there),
+  storage version (16), 1 in preset mode or 0 in manual mode, number of continuous parameters (35), number of stepped parameters (40),
+  the firmware version as text ("V2.51") and a 0 byte.
+Example: F0 00 61 16 04 01 11 01 F7 sets stepped parameter 17 (unison) to 1. F0 00 61 16 05 0C F7, then a patch dump: stored into preset 12.
+
+Fixed in V2.51:
+Importing original SCI Prophet 600 patches (sysex "01 02 nn" in patch management):
+- The LFO targets were wrong: the PW switch went to the filter and the filter switch to the VCA. Pitch, PW and filter now land where they belong.
+- The LFO amount depended on the sound that was playing on the synth instead of the imported patch. It now comes from the patch.
+  Note: with the current scale every SCI patch still gets LFO amount 0 (the 5 bit amount of the original never reaches the threshold); the scale will be revised.
+- Everything an original patch does not have (arp, vibrato, ensemble, tuning, name ...) gets its default value.
 
 
 Thanks -
